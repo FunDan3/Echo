@@ -11,9 +11,11 @@ class default_request_interface:
 		self.handler = handler
 		self._data_to_send = b""
 		self._headers_to_send = {}
-		self.parse_data() # Retrive data based on request type. Specified in sub classes
 		self.path = self.handler.path.split("?")[0] #only the url without the data.
-		self.headers = self.handler.headers
+		self.headers = {}
+		for header in self.handler.headers.keys(): #since handler's headers arent dict it needs to be here
+			self.headers[header] = self.handler.headers[header]
+		self.parse_data() # Retrive data based on request type. Specified in sub classes
 	def write(self, data, codec = None):
 		if not codec: #once again I want to eradicate unexpected behaviour.
 			codec = "utf-8"
@@ -31,7 +33,7 @@ class default_request_interface:
 		for header in self._headers_to_send.keys(): #send recorded headers
 			self.handler.send_header(header, self._headers_to_send[header]) #kind of lame but I have no idea how to do otherwise
 		self.handler.end_headers()
-		self.wfile.write(self._data_to_send) #send recorded data
+		self.handler.wfile.write(self._data_to_send) #send recorded data
 
 class get_interface(default_request_interface):
 	def parse_data(self):
@@ -44,3 +46,6 @@ class get_interface(default_request_interface):
 				self.data[key] = value
 
 
+class post_interface(default_request_interface):
+	def parse_data(self):
+		self.data = self.rfile.read(int(self.headers["Content-Length"]))
