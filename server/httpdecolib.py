@@ -1,10 +1,10 @@
-#! /usr/bin/python3
 # Library that is supposed to ease creation of http/https server
 # Do not use this in any of your project. Its just a trash for school.
 # HTTP is fine because server is not supposed to be able to know anything private about the user
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import re
+from request_interfaces import get_interface
 
 class Exceptions:
 	class DecoratedFunctionCallException(Exception):
@@ -17,9 +17,9 @@ class Exceptions:
 class _WebServerHandlerClass(BaseHTTPRequestHandler):
 	parent = None # I am not certain should I set this or not. I think I should at least to be explicit about varaibles
 	def do_GET(self):
-		self.parent.on_request(self, "get")
+		self.parent.on_request(get_interface(self), "get")
 	def do_POST(self):
-		self.parent.on_request(self, "post")
+		self.parent.on_request(post_interface(self), "post")
 
 class WebServer:
 	get_functions_and_conditions_list = []
@@ -29,7 +29,6 @@ class WebServer:
 		self.handler = _WebServerHandlerClass
 		self.handler.parent = self
 		self.handler = HTTPServer((ip, port), self.handler)
-		print(dir(self.handler))
 		self.handler.parent = self
 	def start(self):
 		try:
@@ -65,7 +64,7 @@ class WebServer:
 			return wrapped_function
 		return decorator
 
-	def on_request(self, handle, request_type):
+	def on_request(self, interface, request_type):
 		for function, condition in eval(f"self.{request_type}_functions_and_conditions_list"): #Safe in theory
-			if condition(handle):
-				function()
+			if condition(interface):
+				function(interface)
