@@ -48,4 +48,4 @@ class get_interface(default_request_interface):
 
 class post_interface(default_request_interface):
 	def parse_data(self):
-		self.data = self.rfile.read(int(self.headers["Content-Length"]))
+		self.data = self.handler.rfile.read(int(self.headers["Content-Length"]))

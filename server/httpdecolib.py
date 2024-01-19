@@ -4,7 +4,7 @@
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import re
-from request_interfaces import get_interface
+from request_interfaces import get_interface, post_interface
 
 class Exceptions:
 	class DecoratedFunctionCallException(Exception):
