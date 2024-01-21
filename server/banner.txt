@@ -1,0 +1,18 @@
+You are connected to 'Echo Messager' vanilla server
+Legal notice:
+	Any content you send on this server is only yours responsibility.
+	Owner of the server  might hand over stored data about you to law enforcement if requested.
+Privacy notice:
+	In order to operate messager server collects and keeps this kinds of data:
+	- Your nickname
+	- Your public keys (for signing and encryption)
+	- Messages that you recieve and unprotected metadata of messages (sender and time when the message was sent)
+	- Hashed version of your password + salt
+	- Your user ID
+	- IP addresses that logged on to your account
+
+	Messages you send are keeped until recipient checks for new messages. Messages are deleated afterwards.
+	Messages are peer to peer encrypted using mceliece8192128 algorithm.
+	Messages are signed using dilithium4 algorithm.
+Limitations:
+	Currently server does not limit you in any way.
