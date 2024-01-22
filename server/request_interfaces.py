@@ -1,4 +1,6 @@
 # Interfaces to ease communication between server and client. Might be insecure...
+import json
+
 class folder:
 	def __init__(self, **kwargs):
 		for key, value in kwargs.items():
@@ -20,7 +22,7 @@ class default_request_interface:
 		for header in self.handler.headers.keys(): #since handler's headers arent dict it needs to be here
 			self.headers[header] = self.handler.headers[header]
 		self.client_address = folder(ip = handler.client_address[0], port = handler.client_address[1])
-		self.parse_data() # Retrive data based on request type. Specified in sub classes
+		self._parse_data() # Retrive data based on request type. Specified in sub classes
 	def write(self, data, codec = None):
 		if not codec: #once again I want to eradicate unexpected behaviour.
 			codec = "utf-8"
@@ -39,9 +41,16 @@ class default_request_interface:
 			self.handler.send_header(header, self._headers_to_send[header]) #kind of lame but I have no idea how to do otherwise
 		self.handler.end_headers()
 		self.handler.wfile.write(self._data_to_send) #send recorded data
+	def verify(self, required_keys):
+		if type(self.data) != dict:
+			raise TypeError("Can not verify non-json data")
+		keys = list(self.data.keys())
+		keys.sort()
+		required_keys.sort()
+		return keys == required_keys
 
 class get_interface(default_request_interface):
-	def parse_data(self):
+	def _parse_data(self):
 		self.data = {}
 		if self.handler.path.count("?") > 0:
 			end_of_path = self.handler.path.split("?")[-1]
@@ -51,6 +60,9 @@ class get_interface(default_request_interface):
 				self.data[key] = value
 
 
+
 class post_interface(default_request_interface):
-	def parse_data(self):
+	def _parse_data(self):
 		self.data = self.handler.rfile.read(int(self.headers["Content-Length"]))
+	def jsonize(self):
+		self.data = json.loads(self.data)
