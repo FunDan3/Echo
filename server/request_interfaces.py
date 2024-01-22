@@ -1,5 +1,8 @@
 # Interfaces to ease communication between server and client. Might be insecure...
-
+class folder:
+	def __init__(self, **kwargs):
+		for key, value in kwargs.items():
+			setattr(self, key, value)
 class default_request_interface:
 	data = None #either hashmap or raw bytes. Depends on request type...
 	headers = None # Hashmep {HeaderName: HeaderValue
@@ -7,6 +10,7 @@ class default_request_interface:
 	_data_to_send = None # I heard that strings work very... Weird in python. Better to ensure everything is ok
 	_headers_to_send = None # Hashmap {HeaderName: HeaderValue}
 	path = None
+	client_address = None
 	def __init__(self, handler):
 		self.handler = handler
 		self._data_to_send = b""
@@ -15,6 +19,7 @@ class default_request_interface:
 		self.headers = {}
 		for header in self.handler.headers.keys(): #since handler's headers arent dict it needs to be here
 			self.headers[header] = self.handler.headers[header]
+		self.client_address = folder(ip = handler.client_address[0], port = handler.client_address[1])
 		self.parse_data() # Retrive data based on request type. Specified in sub classes
 	def write(self, data, codec = None):
 		if not codec: #once again I want to eradicate unexpected behaviour.
