@@ -25,3 +25,16 @@ class encryption:
 		ciphertext = ciphertext[240:]
 		plain_key = enc.decrypt(numbers_to_bytes(private_key), encrypted_key)
 		return aes.decrypt(plain_key, ciphertext)
+
+class signing:
+	def generate_signpair():
+		public_sign, private_sign = sig.generate_keypair()
+		return bytes_to_numbers(public_sign), bytes_to_numbers(private_sign)
+	def sign(private_sign, message):
+		signature = sig.sign(numbers_to_bytes(private_sign), message)
+		return signature+message
+	def verify(public_sign, message):
+		signature = message[:3366]
+		message = message[3366:]
+		assert sig.verify(numbers_to_bytes(public_sign), message, signature)
+		return message
