@@ -41,6 +41,47 @@ def banner(interface):
 	interface.write(BannerContent)
 	interface.finish(200)
 
+@api.get(["/public_key"])
+def send_public_key(interface):
+	if not interface.verify(["username"]):
+		interface.write("Invalid request. Expected fields: 'username'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	if not os.path.exists(f"./storage/users/{interface.data['username']}/"):
+		interface.write("This user does not exist")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if not check_if_string_only_contains_allowed_characters(interface.data["username"]):
+		interface.write("Username contains invalid characters")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	interface.write(ReadFile(f"./storage/users/{interface.data['username']}/public.key", bytes = True))
+	interface.finish(200)
+
+@api.get(["/public_sign"])
+def send_public_key(interface):
+	if not interface.verify(["username"]):
+		interface.write("Invalid request. Expected fields: 'username'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	if not os.path.exists(f"./storage/users/{interface.data['username']}/"):
+		interface.write("This user does not exist")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if not check_if_string_only_contains_allowed_characters(interface.data["username"]):
+		interface.write("Username contains invalid characters")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	interface.write(ReadFile(f"./storage/users/{interface.data['username']}/public.sign", bytes = True))
+	interface.finish(200)
+
+
 @api.post("/login")
 def login_check(interface):
 	interface.jsonize()
