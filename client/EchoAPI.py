@@ -6,6 +6,7 @@ import hashlib
 import requests
 import pickle
 import PQCryptoLayer as crypto
+import copy
 class Exceptions:
 	class EventCallException(Exception):
 		pass
@@ -16,6 +17,16 @@ def _decorated_event(*args, **kwargs):
 def bytes_to_numbers(key):
         return [int(byte) for byte in key]
 
+class user_obj:
+	parent = None #set in client class
+	username = None
+	public_key = None
+	public_sign = None
+	def __init__(self, username):
+		self.username = username
+		self.public_key = requests.get(self.parent.server_url + "public_key?username=" + self.username).content
+		self.public_sign = requests.get(self.parent.server_url + "public_sign?username=" + self.username).content
+
 class client:
 	server_url = None #str
 	token = None #str
@@ -24,6 +35,7 @@ class client:
 	private_key = None #bytes
 	public_sign = None #bytes
 	private_sign = None #bytes
+	user = None
 	class event:
 		on_ready_function = None
 		def __init__(self, owner):
@@ -35,6 +47,9 @@ class client:
 	def __init__(self, server_url):
 		self.server_url = server_url + ("/" if not server_url.endswith("/") else "")
 		self.event = self.event(self)
+		self.user_obj = copy.deepcopy(user_obj) #I have no idea how to implement it better
+		self.user_obj.parent = self
+
 	def generate_keys(self, condition):
 		while True:
 			public_key, private_key = crypto.encryption.generate_keypair()
@@ -67,6 +82,7 @@ class client:
 			"public_key": bytes_to_numbers(self.public_key),
 			"public_sign": bytes_to_numbers(self.public_sign)}).content.decode("utf-8")
 		self.username = username
+		self.user = self.user_obj(self.username)
 		return self.generate_container()
 	def generate_container(self):
 		data = {"username": self.username,
@@ -83,6 +99,7 @@ class client:
 		login_request = requests.post(self.server_url+"login", json = {"login": self.username, "token": self.token})
 		if login_request.status_code!=200:
 			raise Exception(login_request.content.decode("utf-8"))
+		self.user = self.user_obj(self.username)
 	def read_banner(self):
 		return requests.get(self.server_url+"banner.txt").content.decode("utf-8")
 	def main_loop(self):

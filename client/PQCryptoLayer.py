@@ -28,11 +28,3 @@ class signing:
 		message = message[3366:]
 		assert sig.verify(public_sign, message, signature)
 		return message
-
-""" This code will be later used in main api. Currently it is unused.
-def bytes_to_numbers(key):
-	return [int(byte) for byte in key]
-
-def numbers_to_bytes(numbers):
-	return bytes(bytearray(numbers))
-"""
