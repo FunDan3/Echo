@@ -7,12 +7,15 @@ class DictLayer:
 	filename = None #String (path)
 	data = None #Dict
 	autosave = None #Bool
-	def __init__(self, filename, template = None, autosave = False):
+	def __init__(self, filename, template = None, autosave = False, autowrite = True):
 		if not template:
 			template = {}
 		self.filename = filename
 		if not os.path.exists(filename):
-			self._GenerateFile(template) #self.data would be equal to template
+			if autowrite:
+				self._GenerateFile(template) #self.data would be equal to template
+			else:
+				self.data = template
 		else:
 			self.data = self._read()
 		self.autosave = autosave
