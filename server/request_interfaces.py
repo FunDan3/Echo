@@ -6,7 +6,8 @@ class folder:
 		for key, value in kwargs.items():
 			setattr(self, key, value)
 class default_request_interface:
-	data = None #either hashmap or raw bytes. Depends on request type...
+	json = None #dict
+	data = None #either hashmap raw bytes
 	headers = None # Hashmep {HeaderName: HeaderValue
 	handler = None # web_handler object
 	_data_to_send = None # I heard that strings work very... Weird in python. Better to ensure everything is ok
@@ -42,22 +43,22 @@ class default_request_interface:
 		self.handler.end_headers()
 		self.handler.wfile.write(self._data_to_send) #send recorded data
 	def verify(self, required_keys):
-		if type(self.data) != dict:
+		if type(self.json) != dict:
 			raise TypeError("Can not verify non-json data")
-		keys = list(self.data.keys())
+		keys = list(self.json.keys())
 		keys.sort()
 		required_keys.sort()
 		return keys == required_keys
 
 class get_interface(default_request_interface):
 	def _parse_data(self):
-		self.data = {}
+		self.json = {}
 		if self.handler.path.count("?") > 0:
 			end_of_path = self.handler.path.split("?")[-1]
 			key_value_pairs = end_of_path.split("&")
 			for key_value_pair in key_value_pairs:
 				key, value = key_value_pair.split("=")
-				self.data[key] = value
+				self.json[key] = value
 
 
 
@@ -65,4 +66,10 @@ class post_interface(default_request_interface):
 	def _parse_data(self):
 		self.data = self.handler.rfile.read(int(self.headers["Content-Length"]))
 	def jsonize(self):
-		self.data = json.loads(self.data)
+		splitdata = self.data.split(b"\n", 1)
+		if len(splitdata) == 1:
+			self.json = json.loads(splitdata[0])
+			self.data = None
+		else:
+			self.json = json.loads(splitdata[0])
+			self.data = splitdata[1]
