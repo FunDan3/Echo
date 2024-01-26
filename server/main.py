@@ -133,8 +133,10 @@ def register(interface):
 	token = hashlib.sha512()
 	token.update(f"{interface.data['login']}{interface.data['password']}{user_data['last_uid']}{time.time()}".encode("utf-8"))
 	token = token.hexdigest()
-	user_config = DictLayer(f"./storage/users/{interface.data['login']}/data.json", template = {"LastLogin": time.time(), "IpList": [interface.client_address.ip], "token": token, "uid": user_data["last_uid"], "PublicMetadata": {}})
+	user_config = DictLayer(f"./storage/users/{interface.data['login']}/data.json", template = {"LastLogin": time.time(), "IpList": [interface.client_address.ip], "token": token, "uid": user_data["last_uid"], "PublicMetadata": {}, "PrivateMetadata": {"DataSent": 0}})
 	user_config.save()
+	message_config = DictLayer(f"./storage/users/{interface.data['login']}/inbox/messages.json", template = {"LastMID": 0, "MessagesMetadata": {}})
+	message_config.save()
 	WriteFile(f"./storage/users/{interface.data['login']}/public.key", numbers_to_bytes(interface.data["public_key"]))
 	WriteFile(f"./storage/users/{interface.data['login']}/public.sign", numbers_to_bytes(interface.data["public_key"]))
 	user_data["tokens"][interface.data["login"]] = token
