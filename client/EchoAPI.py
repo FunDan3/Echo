@@ -50,6 +50,14 @@ class client:
 		self.user_obj = copy.deepcopy(user_obj) #I have no idea how to implement it better
 		self.user_obj.parent = self
 
+	def basic_request_post(self, path, json_data = None, data = None):
+		if not json_data:
+			json_data = {}
+		if not data:
+			data = b""
+		to_send = json.dumps(json_data).encode("utf-8") + b"\n" + data
+		return requests.post(self.server_url+path, data = to_send).content
+
 	def generate_keys(self, condition):
 		while True:
 			public_key, private_key = crypto.encryption.generate_keypair()
