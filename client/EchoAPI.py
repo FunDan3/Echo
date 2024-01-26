@@ -10,6 +10,10 @@ import copy
 class Exceptions:
 	class EventCallException(Exception):
 		pass
+	class InvalidRequestException(Exception):
+		pass
+	class DeceptiveServerException(Exception):
+		pass
 
 def _decorated_event(*args, **kwargs):
 	raise EventCallException(f"Functions decorated by class.event is not supposed to be called")
@@ -24,8 +28,8 @@ class user_obj:
 	public_sign = None
 	def __init__(self, username):
 		self.username = username
-		self.public_key = requests.get(self.parent.server_url + "public_key?username=" + self.username).content
-		self.public_sign = requests.get(self.parent.server_url + "public_sign?username=" + self.username).content
+		self.public_key = self.parent.basic_request_get("public_key", json_data = {"username": username}).content
+		self.public_sign = self.parent.basic_request_get("public_sign", json_data = {"username": username}).content
 
 class client:
 	server_url = None #str
@@ -50,24 +54,50 @@ class client:
 		self.user_obj = copy.deepcopy(user_obj) #I have no idea how to implement it better
 		self.user_obj.parent = self
 
+	def verify_response(self, response):
+		if response.status_code not in range(200, 300):
+			raise Exceptions.InvalidRequestException(response.content.decode("utf-8"))
+
 	def basic_request_post(self, path, json_data = None, data = None):
 		if not json_data:
 			json_data = {}
 		if not data:
 			data = b""
 		to_send = json.dumps(json_data).encode("utf-8") + b"\n" + data
-		return requests.post(self.server_url+path, data = to_send).content
+		response = requests.post(self.server_url + path, data = to_send)
+		self.verify_response(response)
+		return response
+
+	def auth_request_post(self, path, json_data = None, data = None):
+		if not json_data:
+			json_data = {}
+		json_data["login"] = self.user.username
+		json_data["token"] = self.token
+		return self.basic_request_post(path, json_data, data)
+
+	def basic_request_get(self, path, json_data = None):
+		if not json_data:
+			json_data = {}
+		first = True
+		for key, value in json_data.items():
+			path += ("?" if first else "&") + f"{key}={value}"
+			first = False
+		response = requests.get(self.server_url + path)
+		self.verify_response(response)
+		return response
 
 	def generate_keys(self, condition):
 		while True:
 			public_key, private_key = crypto.encryption.generate_keypair()
 			if condition(public_key, private_key):
 				return public_key, private_key
+
 	def generate_signs(self, condition):
 		while True:
 			public_sign, private_sign = crypto.signing.generate_signs()
 			if condition(public_sign, private_sign):
 				return public_sign, private_sign
+
 	def generate_cryptodata(self, key_condition = None, sign_condition = None, overall_condition = None):
 		anything = lambda *args, **kwargs: True
 		if not key_condition:
@@ -81,36 +111,46 @@ class client:
 			public_sign, private_sign = self.generate_signs(sign_condition)
 			if overall_condition(public_key, private_key, public_sign, private_sign):
 				return public_key, private_key, public_sign, private_sign
+
 	def register(self, username, password, cryptodata = None):
 		if not cryptodata:
 			cryptodata = self.generate_cryptodata()
-		self.public_key, self.private_key, self.public_sign, self.private_sign = cryptodata
-		self.token = requests.post(self.server_url+"register", json = {"login": username,
+		public_key, self.private_key, public_sign, self.private_sign = cryptodata
+		self.token = self.basic_request_post("register", json_data = {"login": username,
 			"password": password,
-			"public_key": bytes_to_numbers(self.public_key),
-			"public_sign": bytes_to_numbers(self.public_sign)}).content.decode("utf-8")
-		self.username = username
-		self.user = self.user_obj(self.username)
+			"public_key": bytes_to_numbers(public_key),
+			"public_sign": bytes_to_numbers(public_sign)}).content.decode("utf-8")
+		self.user = self.user_obj(username)
 		return self.generate_container()
+
 	def generate_container(self):
-		data = {"username": self.username,
+		data = {"username": self.user.username,
 			"token": self.token,
-			"public_key": self.public_key,
+			"public_key": self.user.public_key,
 			"private_key": self.private_key,
-			"public_sign": self.public_sign,
+			"public_sign": self.user.public_sign,
 			"private_sign": self.private_sign}
 		return pickle.dumps(data)
+
 	def login(self, container):
 		data = pickle.loads(container) #not quite safest but should be trusted
-		for varaible, value in data.items():
-			setattr(self, varaible, value)
-		login_request = requests.post(self.server_url+"login", json = {"login": self.username, "token": self.token})
-		if login_request.status_code!=200:
-			raise Exception(login_request.content.decode("utf-8"))
-		self.user = self.user_obj(self.username)
+		self.user = self.user_obj(data["username"])
+
+		public_key = data["public_key"]
+		public_sign = data["public_sign"]
+		if public_key != self.user.public_key or public_sign != self.user.public_sign:
+			raise Exceptions.DeceptiveServerException("Server's response to public key/sign doesnt match recorded one")
+
+		self.token = data["token"]
+		self.private_key = data["private_key"]
+		self.private_sign = data["private_sign"]
+		login_request = self.auth_request_post("login")
+
 	def read_banner(self):
-		return requests.get(self.server_url+"banner.txt").content.decode("utf-8")
+		return self.basic_request_get("banner.txt").content.decode("utf-8")
+
 	def main_loop(self):
 		self.event.on_ready_function()
+
 	def start(self):
 		self.main_loop()
