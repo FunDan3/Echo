@@ -28,6 +28,27 @@ def WriteFile(filename, data):
 def numbers_to_bytes(numbers):
 	return bytes(bytearray(numbers))
 
+def verify_login(interface):
+	if not os.path.exists(f"./storage/users/{interface.json['login']}/"):
+		interface.write("No such user")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if not check_if_string_only_contains_allowed_characters(interface.json["login"]):
+		interface.write("Login field can only contain letters, numbers and underscore")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if interface.json["login"] not in user_data["tokens"]:
+		user_data["tokens"][interface.json['login']] = DictLayer(f"./storage/users/{interface.json['login']}/data.json", autowrite = False)["token"]
+	if interface.json["token"] == user_data["tokens"][interface.json["login"]]: #TODO: safe compation
+		return True
+	else:
+		interface.write("Invalid token")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+
 config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 8080})
 user_data = DictLayer("./storage/users/user_data.json", template = {"last_uid": 0, "tokens": {}}, autosave = True)
 BannerContent = ReadFile("./banner.txt")
@@ -90,14 +111,7 @@ def login_check(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
-	if not os.path.exists(f"./storage/users/{interface.json['login']}/"):
-		interface.write("No such user")
-		interface.header("Content-Type", "text/plain")
-		interface.finish(401)
-		return
-	if interface.json["login"] not in user_data["tokens"]:
-		user_data["tokens"][interface.json['login']] = DictLayer(f"./storage/users/{interface.json['login']}/data.json", autowrite = False)["token"]
-	if interface.json["token"] == user_data["tokens"][interface.json["login"]]: #TODO: safe compation
+	if verify_login(interface):
 		interface.write("Success")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(200)
@@ -108,9 +122,6 @@ def login_check(interface):
 		user_config.save()
 		return
 	else:
-		interface.write("Invalid token")
-		interface.header("Content-Type", "text/plain")
-		interface.finish(401)
 		return
 @api.post(["/register"])
 def register(interface):
