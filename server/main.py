@@ -56,6 +56,33 @@ BannerContent = ReadFile("./banner.txt")
 
 api = WebServer(config["Host"], config["Port"])
 
+
+@api.post("/message")
+def message(interface):
+	interface.jsonize()
+	if not interface.verify(["login", "token", "recipient"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token', 'recipient'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	if not verify_login(interface):
+		return
+	if not check_if_string_only_contains_allowed_characters(interface.json["recipient"]):
+		interface.write("recipient may only contain letters, numbers and underscore")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if not os.path.exists(f"./storage/users/{interface.json['recipient']}/"):
+		interface.write("Invalid request. Expected fields: 'username'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	message_config = DictLayer(f"./storage/users/{interface.json['recipient']}/inbox/messages.json", autowrite = False)
+	WriteFile(f"./storage/users/{interface.json['recipient']}/inbox/{message_config['LastMID']}.content", interface.data)
+	message_config["MessagesMetadata"][message_config["LastMID"]] = {"Sender": interface.json["login"], "time": time.time()}
+	message_config["LastMID"] = message_config["LastMID"] + 1
+	message_config.save()
+	interface.finish(200)
 @api.get(["/banner.txt"])
 def banner(interface):
 	interface.header("Content-Type", "text/plain")
