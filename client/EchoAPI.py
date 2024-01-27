@@ -54,6 +54,9 @@ class client:
 		self.user_obj = copy.deepcopy(user_obj) #I have no idea how to implement it better
 		self.user_obj.parent = self
 
+	def fetch_user(self, username):
+		return self.user_obj(username)
+
 	def verify_response(self, response):
 		if response.status_code not in range(200, 300):
 			raise Exceptions.InvalidRequestException(response.content.decode("utf-8"))
