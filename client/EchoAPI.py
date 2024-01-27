@@ -14,14 +14,15 @@ class Exceptions:
 		pass
 	class DeceptiveServerException(Exception):
 		pass
-
+	class MultipleClientsLaunchedException(Exception):
+		pass
 def _decorated_event(*args, **kwargs):
 	raise EventCallException(f"Functions decorated by class.event is not supposed to be called")
 
 def bytes_to_numbers(key):
         return [int(byte) for byte in key]
 
-class user_obj:
+class User:
 	parent = None #set in client class
 	username = None
 	public_key = None
@@ -30,14 +31,15 @@ class user_obj:
 		self.username = username
 		self.public_key = self.parent.basic_request_get("public_key", json_data = {"username": username}).content
 		self.public_sign = self.parent.basic_request_get("public_sign", json_data = {"username": username}).content
+	def dm_raw_bytes(self, raw_data):
+		to_send = crypto.encryption.encrypt(self.public_key, crypto.signing.sign(self.parent.private_sign, raw_data))
+		self.parent.auth_request_post("message", json_data = {"recipient": self.username}, data = to_send)
 
 class client:
 	server_url = None #str
 	token = None #str
 	username = None #str
-	public_key = None #bytes
 	private_key = None #bytes
-	public_sign = None #bytes
 	private_sign = None #bytes
 	user = None
 	class event:
@@ -51,11 +53,9 @@ class client:
 	def __init__(self, server_url):
 		self.server_url = server_url + ("/" if not server_url.endswith("/") else "")
 		self.event = self.event(self)
-		self.user_obj = copy.deepcopy(user_obj) #I have no idea how to implement it better
-		self.user_obj.parent = self
-
-	def fetch_user(self, username):
-		return self.user_obj(username)
+		if User.parent:
+			raise Exceptions.MultipleClientsLaunchedException("You can not run multiple clients at the same time")
+		User.parent = self
 
 	def verify_response(self, response):
 		if response.status_code not in range(200, 300):
@@ -123,7 +123,7 @@ class client:
 			"password": password,
 			"public_key": bytes_to_numbers(public_key),
 			"public_sign": bytes_to_numbers(public_sign)}).content.decode("utf-8")
-		self.user = self.user_obj(username)
+		self.user = self.User(username)
 		return self.generate_container()
 
 	def generate_container(self):
@@ -137,7 +137,7 @@ class client:
 
 	def login(self, container):
 		data = pickle.loads(container) #not quite safest but should be trusted
-		self.user = self.user_obj(data["username"])
+		self.user = User(data["username"])
 
 		public_key = data["public_key"]
 		public_sign = data["public_sign"]
