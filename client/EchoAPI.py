@@ -22,6 +22,21 @@ def _decorated_event(*args, **kwargs):
 def bytes_to_numbers(key):
         return [int(byte) for byte in key]
 
+class Message:
+	sent_time = None
+	author = None
+	content = None
+	parent = None
+	def __init__(self, server_response_content):
+		json_data = json.loads(server_response_content.split(b"\n", 1)[0])
+		message_data = server_response_content.split(b"\n", 1)[1]
+		self.sent_time = json_data["time"]
+		self.author = User(json_data["Sender"])
+		self.content = self._decrypt_message(message_data)
+	def _decrypt_message(self, encrypted_message):
+		unverified_message = crypto.encryption.decrypt(self.parent.private_key, encrypted_message)
+		verified_message = crypto.signing.verify(self.author.public_sign, unverified_message)
+		return verified_message
 class User:
 	parent = None #set in client class
 	username = None
@@ -56,6 +71,7 @@ class client:
 		if User.parent:
 			raise Exceptions.MultipleClientsLaunchedException("You can not run multiple clients at the same time")
 		User.parent = self
+		Message.parent = self
 
 	def verify_response(self, response):
 		if response.status_code not in range(200, 300):
@@ -123,8 +139,11 @@ class client:
 			"password": password,
 			"public_key": bytes_to_numbers(public_key),
 			"public_sign": bytes_to_numbers(public_sign)}).content.decode("utf-8")
-		self.user = self.User(username)
+		self.user = User(username)
 		return self.generate_container()
+
+	def fetch_message(self):
+		return Message(self.auth_request_post("fetch_message").content)
 
 	def generate_container(self):
 		data = {"username": self.user.username,
