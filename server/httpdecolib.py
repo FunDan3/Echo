@@ -65,6 +65,12 @@ class WebServer:
 		return decorator
 
 	def on_request(self, interface, request_type):
+		satisfied = False
 		for function, condition in eval(f"self.{request_type}_functions_and_conditions_list"): #Safe in theory
 			if condition(interface):
 				function(interface)
+				satisfied = True
+		if not satisfied:
+			interface.write("No function checher conditions were met")
+			interface.header("Content-Type", "text/plain")
+			interface.finish(404)
