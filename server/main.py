@@ -6,6 +6,7 @@ from configlib import DictLayer
 import hashlib
 import os
 import time
+import json
 
 allowed_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
 
@@ -49,6 +50,13 @@ def verify_login(interface):
 		interface.finish(401)
 		return
 
+def get_min_time_key(message_dict):
+	return_value = ("", 9999999999999999999999999999999999)
+	for message_key in message_dict.keys():
+		if message_dict[message_key]["time"] < return_value[1]:
+			return_value = (message_key, message_dict[message_key]["time"])
+	return return_value[0]
+
 config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 8080})
 user_data = DictLayer("./storage/users/user_data.json", template = {"last_uid": 0, "tokens": {}}, autosave = True)
 BannerContent = ReadFile("./banner.txt")
@@ -56,6 +64,28 @@ BannerContent = ReadFile("./banner.txt")
 
 api = WebServer(config["Host"], config["Port"])
 
+@api.post("/fetch_message")
+def fetch_message(interface):
+	def sort_key(item):
+		return item["time"]
+	interface.jsonize()
+	if not interface.verify(["login", "token"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	if not verify_login(interface):
+		return
+	message_config = DictLayer(f"./storage/users/{interface.json['login']}/inbox/messages.json", autowrite = False)
+	first_timed_mid = get_min_time_key(message_config["MessagesMetadata"])
+	if not message_config["MessagesMetadata"]:
+		interface.write("")
+		interface.finish(200)
+		return
+	interface.write(json.dumps(message_config["MessagesMetadata"][first_timed_mid])+"\n")
+	with open(f"./storage/users/{interface.json['login']}/inbox/{first_timed_mid}.content", "rb") as f:
+		interface.write(f.read())
+	interface.finish(200)
 
 @api.post("/message")
 def message(interface):
@@ -83,6 +113,7 @@ def message(interface):
 	message_config["LastMID"] = message_config["LastMID"] + 1
 	message_config.save()
 	interface.finish(200)
+
 @api.get(["/banner.txt"])
 def banner(interface):
 	interface.header("Content-Type", "text/plain")
@@ -176,7 +207,7 @@ def register(interface):
 	message_config = DictLayer(f"./storage/users/{interface.json['login']}/inbox/messages.json", template = {"LastMID": 0, "MessagesMetadata": {}})
 	message_config.save()
 	WriteFile(f"./storage/users/{interface.json['login']}/public.key", numbers_to_bytes(interface.json["public_key"]))
-	WriteFile(f"./storage/users/{interface.json['login']}/public.sign", numbers_to_bytes(interface.json["public_key"]))
+	WriteFile(f"./storage/users/{interface.json['login']}/public.sign", numbers_to_bytes(interface.json["public_sign"]))
 	user_data["tokens"][interface.json["login"]] = token
 	user_data["last_uid"] = user_data["last_uid"] + 1
 	interface.write(token)
