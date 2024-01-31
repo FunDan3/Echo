@@ -8,6 +8,8 @@ import pickle
 import PQCryptoLayer as crypto
 import copy
 import time
+import asyncio
+
 class Exceptions:
 	class EventCallException(Exception):
 		pass
@@ -34,6 +36,7 @@ class Message:
 		self.sent_time = json_data["time"]
 		self.author = User(json_data["Sender"])
 		self.content = self._decrypt_message(message_data)
+
 	def _decrypt_message(self, encrypted_message):
 		unverified_message = crypto.encryption.decrypt(self.parent.private_key, encrypted_message)
 		verified_message = crypto.signing.verify(self.author.public_sign, unverified_message)
@@ -62,10 +65,13 @@ class client:
 	class event:
 		on_ready_function = None
 		on_message_function = None
-
 		def __init__(self, owner):
-			self.on_ready_function = lambda: print(owner.read_banner())
-			self.on_message_function = lambda message: print(f"[{message.author.username}] -> '{message.content}'")
+			async def on_ready_function():
+				print(owner.read_banner())
+			async def on_message_function(message):
+				print(f"{message.author.username} -> {message.content}")
+			self.on_ready_function = on_ready_function
+			self.on_message_function = on_message_function
 
 		def on_ready(self):
 			def init_wrapper(function):
@@ -198,11 +204,14 @@ class client:
 	def read_banner(self):
 		return self.basic_request_get("banner.txt").content.decode("utf-8")
 
-	def main_loop(self):
-		self.event.on_ready_function()
+	async def message_loop(self):
 		while True:
 			for message in self.fetch_messages():
-				self.event.on_message_function(message)
-			time.sleep(self.main_loop_delay)
+				await self.event.on_message_function(message)
+			await asyncio.sleep(self.main_loop_delay)
+
+	async def async_start(self):
+		await asyncio.gather(self.event.on_ready_function(), self.message_loop())
+
 	def start(self):
-		self.main_loop()
+		asyncio.run(self.async_start())
