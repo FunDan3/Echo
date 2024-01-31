@@ -86,6 +86,11 @@ def fetch_message(interface):
 	with open(f"./storage/users/{interface.json['login']}/inbox/{first_timed_mid}.content", "rb") as f:
 		interface.write(f.read())
 	interface.finish(200)
+	del message_config["MessagesMetadata"][first_timed_mid]
+	if not message_config["MessagesMetadata"]: #if it is empty
+		message_config["LastMID"] = 0
+	message_config.save()
+	os.remove(f"./storage/users/{interface.json['login']}/inbox/{first_timed_mid}.content")
 
 @api.post("/message")
 def message(interface):
