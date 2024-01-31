@@ -7,6 +7,7 @@ import requests
 import pickle
 import PQCryptoLayer as crypto
 import copy
+import time
 class Exceptions:
 	class EventCallException(Exception):
 		pass
@@ -54,24 +55,38 @@ class client:
 	server_url = None #str
 	token = None #str
 	username = None #str
+	main_loop_delay = None #int/float
 	private_key = None #bytes
 	private_sign = None #bytes
 	user = None
 	class event:
 		on_ready_function = None
+		on_message_function = None
+
 		def __init__(self, owner):
 			self.on_ready_function = lambda: print(owner.read_banner())
+			self.on_message_function = lambda message: print(f"[{message.author.username}] -> '{message.content}'")
+
 		def on_ready(self):
 			def init_wrapper(function):
 				self.on_ready_function = function
 				return _decorated_event
-	def __init__(self, server_url):
+			return init_wrapper
+
+		def on_message(self):
+			def init_wrapper(function):
+				self.on_message_function = function
+				return _decorated_event
+			return init_wrapper
+
+	def __init__(self, server_url, main_loop_delay = 10):
 		self.server_url = server_url + ("/" if not server_url.endswith("/") else "")
 		self.event = self.event(self)
 		if User.parent:
 			raise Exceptions.MultipleClientsLaunchedException("You can not run multiple clients at the same time")
 		User.parent = self
 		Message.parent = self
+		self.main_loop_delay = main_loop_delay
 
 	def verify_response(self, response):
 		if response.status_code not in range(200, 300):
@@ -143,7 +158,19 @@ class client:
 		return self.generate_container()
 
 	def fetch_message(self):
-		return Message(self.auth_request_post("fetch_message").content)
+		server_response = self.auth_request_post("fetch_message").content
+		if not server_response:
+			return None
+		return Message(server_response)
+
+	def fetch_messages(self):
+		collected_messages = []
+		while True:
+			message = self.fetch_message()
+			if not message:
+				break
+			collected_messages.append(message)
+		return collected_messages
 
 	def generate_container(self):
 		data = {"username": self.user.username,
@@ -173,6 +200,9 @@ class client:
 
 	def main_loop(self):
 		self.event.on_ready_function()
-
+		while True:
+			for message in self.fetch_messages():
+				self.event.on_message_function(message)
+			time.sleep(self.main_loop_delay)
 	def start(self):
 		self.main_loop()
