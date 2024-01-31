@@ -7,7 +7,6 @@ import requests
 import pickle
 import PQCryptoLayer as crypto
 import copy
-import time
 import asyncio
 
 class Exceptions:
@@ -25,22 +24,40 @@ def _decorated_event(*args, **kwargs):
 def bytes_to_numbers(key):
         return [int(byte) for byte in key]
 
+class _folder:
+	def __init__(self, **kwargs):
+		for key, value in kwargs.items():
+			setattr(self, key, value)
+
 class Message:
 	sent_time = None
 	author = None
 	content = None
 	parent = None
+	type = None
+	metadata = None
 	def __init__(self, server_response_content):
 		json_data = json.loads(server_response_content.split(b"\n", 1)[0])
 		message_data = server_response_content.split(b"\n", 1)[1]
 		self.sent_time = json_data["time"]
 		self.author = User(json_data["Sender"])
-		self.content = self._decrypt_message(message_data)
+		self.retrieve_content(self._decrypt_message(message_data))
+
+	def retrieve_content(self, data):
+		json_data = json.loads(data.split(b"\n", 1)[0])
+		self.content = data.split(b"\n", 1)[1]
+		self.metadata = _folder(**json_data["metadata"])
+		split_type = json_data["type"].split("#", 1) #format for json_data['type']: {primary type}/{secondary type}#{encoding (optional)}
+		self.type = split_type[0]
+		if len(split_type) == 2: #if encoding is specified
+			encoding = split_type[1]
+			self.content = self.content.decode(encoding)
 
 	def _decrypt_message(self, encrypted_message):
 		unverified_message = crypto.encryption.decrypt(self.parent.private_key, encrypted_message)
 		verified_message = crypto.signing.verify(self.author.public_sign, unverified_message)
 		return verified_message
+
 class User:
 	parent = None #set in client class
 	username = None
@@ -53,6 +70,17 @@ class User:
 	def dm_raw_bytes(self, raw_data):
 		to_send = crypto.encryption.encrypt(self.public_key, crypto.signing.sign(self.parent.private_sign, raw_data))
 		self.parent.auth_request_post("message", json_data = {"recipient": self.username}, data = to_send)
+
+	def dm_text(self, text, encoding = None, metadata = None):
+		if not metadata:
+			metadata = {}
+		if not encoding:
+			encoding = "utf-8"
+		if type(text)!=str:
+			raise TypeError(f"text type should be string. Got: {type(text)}")
+		json_data = json.dumps({"type": f"text/plain#{encoding}", "metadata": metadata})
+		to_send = json_data.encode("utf-8") + b"\n" + text.encode(encoding)
+		self.dm_raw_bytes(to_send)
 
 class client:
 	server_url = None #str
