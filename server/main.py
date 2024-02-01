@@ -40,12 +40,13 @@ def verify_login(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if interface.json["login"] not in user_data["tokens"]:
-		user_data["tokens"][interface.json['login']] = DictLayer(f"./storage/users/{interface.json['login']}/data.json", autowrite = False)["token"]
-	if interface.json["token"] == user_data["tokens"][interface.json["login"]]: #TODO: safe compation
+	password_hash = hashlib.sha512()
+	password_hash.update(f"{interface.json['login']}{interface.json['password']}".encode("utf-8"))
+	password_hash = password_hash.hexdigest()
+	if password_hash == user_data["password_hashes"][interface.json["login"]]: #it is probably safe...
 		return True
 	else:
-		interface.write("Invalid token")
+		interface.write("Invalid password")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
@@ -58,7 +59,7 @@ def get_min_time_key(message_dict):
 	return return_value[0]
 
 config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 8080})
-user_data = DictLayer("./storage/users/user_data.json", template = {"last_uid": 0, "tokens": {}}, autosave = True)
+user_data = DictLayer("./storage/users/user_data.json", template = {"last_uid": 0, "password_hashes": {}})
 BannerContent = ReadFile("./banner.txt")
 
 
@@ -69,8 +70,8 @@ def fetch_message(interface):
 	def sort_key(item):
 		return item["time"]
 	interface.jsonize()
-	if not interface.verify(["login", "token"]):
-		interface.write("Invalid request. Expected fields: 'login', 'token'")
+	if not interface.verify(["login", "password"]):
+		interface.write("Invalid request. Expected fields: 'login', 'password'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -79,7 +80,6 @@ def fetch_message(interface):
 	message_config = DictLayer(f"./storage/users/{interface.json['login']}/inbox/messages.json", autowrite = False)
 	first_timed_mid = get_min_time_key(message_config["MessagesMetadata"])
 	if not message_config["MessagesMetadata"]:
-		interface.write("")
 		interface.finish(200)
 		return
 	interface.write(json.dumps(message_config["MessagesMetadata"][first_timed_mid])+"\n")
@@ -95,8 +95,8 @@ def fetch_message(interface):
 @api.post("/message")
 def message(interface):
 	interface.jsonize()
-	if not interface.verify(["login", "token", "recipient"]):
-		interface.write("Invalid request. Expected fields: 'login', 'token', 'recipient'")
+	if not interface.verify(["login", "password", "recipient"]):
+		interface.write("Invalid request. Expected fields: 'login', 'password', 'recipient'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -169,8 +169,8 @@ def send_public_key(interface):
 @api.post("/login")
 def login_check(interface):
 	interface.jsonize()
-	if not interface.verify(["login", "token"]):
-		interface.write("Invalid request. Expected fields: 'login', 'token'")
+	if not interface.verify(["login", "password"]):
+		interface.write("Invalid request. Expected fields: 'login', 'password'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -204,17 +204,17 @@ def register(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	token = hashlib.sha512()
-	token.update(f"{interface.json['login']}{interface.json['password']}{user_data['last_uid']}{time.time()}".encode("utf-8"))
-	token = token.hexdigest()
-	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json", template = {"LastLogin": time.time(), "IpList": [interface.client_address.ip], "token": token, "uid": user_data["last_uid"], "PublicMetadata": {}, "PrivateMetadata": {"DataSent": 0}})
+	password_hash = hashlib.sha512()
+	password_hash.update(f"{interface.json['login']}{interface.json['password']}".encode("utf-8"))
+	password_hash = password_hash.hexdigest()
+	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json", template = {"LastLogin": time.time(), "IpList": [interface.client_address.ip], "uid": user_data["last_uid"], "PublicMetadata": {}, "PrivateMetadata": {}, "DataSent": 0})
 	user_config.save()
 	message_config = DictLayer(f"./storage/users/{interface.json['login']}/inbox/messages.json", template = {"LastMID": 0, "MessagesMetadata": {}})
 	message_config.save()
 	WriteFile(f"./storage/users/{interface.json['login']}/public.key", numbers_to_bytes(interface.json["public_key"]))
 	WriteFile(f"./storage/users/{interface.json['login']}/public.sign", numbers_to_bytes(interface.json["public_sign"]))
-	user_data["tokens"][interface.json["login"]] = token
+	user_data["password_hashes"][interface.json["login"]] = password_hash
 	user_data["last_uid"] = user_data["last_uid"] + 1
-	interface.write(token)
+	user_data.save()
 	interface.finish(200)
 api.start()

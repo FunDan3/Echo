@@ -89,6 +89,7 @@ class client:
 	main_loop_delay = None #int/float
 	private_key = None #bytes
 	private_sign = None #bytes
+	password = None #string
 	user = None
 	class event:
 		on_ready_function = None
@@ -140,7 +141,7 @@ class client:
 		if not json_data:
 			json_data = {}
 		json_data["login"] = self.user.username
-		json_data["token"] = self.token
+		json_data["password"] = self.password
 		return self.basic_request_post(path, json_data, data)
 
 	def basic_request_get(self, path, json_data = None):
@@ -184,7 +185,8 @@ class client:
 		if not cryptodata:
 			cryptodata = self.generate_cryptodata()
 		public_key, self.private_key, public_sign, self.private_sign = cryptodata
-		self.token = self.basic_request_post("register", json_data = {"login": username,
+		self.password = password
+		self.basic_request_post("register", json_data = {"login": username,
 			"password": password,
 			"public_key": bytes_to_numbers(public_key),
 			"public_sign": bytes_to_numbers(public_sign)}).content.decode("utf-8")
@@ -208,7 +210,7 @@ class client:
 
 	def generate_container(self):
 		data = {"username": self.user.username,
-			"token": self.token,
+			"password": self.password,
 			"public_key": self.user.public_key,
 			"private_key": self.private_key,
 			"public_sign": self.user.public_sign,
@@ -224,7 +226,7 @@ class client:
 		if public_key != self.user.public_key or public_sign != self.user.public_sign:
 			raise Exceptions.DeceptiveServerException("Server's response to public key/sign doesnt match recorded one")
 
-		self.token = data["token"]
+		self.password = data["password"]
 		self.private_key = data["private_key"]
 		self.private_sign = data["private_sign"]
 		login_request = self.auth_request_post("login")
