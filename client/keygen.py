@@ -7,6 +7,7 @@ import pickle
 import hashlib
 import base64
 import colorama
+import time
 
 colorama.init()
 key_start = input("How do you want to start your verification hash: ")
@@ -15,10 +16,10 @@ def gencrypto():
 	client = EchoAPI.client("")
 	while not os.path.exists("./cryptodata.pickle"):
 		public_key, private_key, public_sign, private_sign = client.generate_cryptodata()
-		verification_hash = hashlib.new("sha1")
+		verification_hash = hashlib.new("md5")
 		verification_hash.update(public_key)
 		verification_hash.update(public_sign)
-		hash = base64.b64encode(verification_hash.digest()).decode("utf-8")
+		hash = base64.b64encode(verification_hash.digest()).decode("utf-8").replace("=", "")
 		toprint = colorama.Fore.LIGHTGREEN_EX
 		for i in range(len(key_start)):
 			if hash[i] != key_start[i]:
