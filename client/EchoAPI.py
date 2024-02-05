@@ -8,6 +8,7 @@ import pickle
 import PQCryptoLayer as crypto
 import copy
 import asyncio
+import base64
 
 class Exceptions:
 	class EventCallException(Exception):
@@ -63,10 +64,16 @@ class User:
 	username = None
 	public_key = None
 	public_sign = None
+	public_hash = None
 	def __init__(self, username):
 		self.username = username
 		self.public_key = self.parent.basic_request_get("public_key", json_data = {"username": username}).content
 		self.public_sign = self.parent.basic_request_get("public_sign", json_data = {"username": username}).content
+		public_hash = hashlib.new("md5")
+		public_hash.update(self.public_key)
+		public_hash.update(self.public_sign)
+		self.public_hash = base64.b64encode(public_hash.digest()).decode("utf-8").replace("=", "")
+
 	def dm_raw_bytes(self, raw_data):
 		to_send = crypto.encryption.encrypt(self.public_key, crypto.signing.sign(self.parent.private_sign, raw_data))
 		self.parent.auth_request_post("message", json_data = {"recipient": self.username}, data = to_send)
@@ -98,7 +105,7 @@ class client:
 			async def on_ready_function():
 				print(owner.read_banner())
 			async def on_message_function(message):
-				print(f"{message.author.username} -> {message.content}")
+				print(f"{message.author.username}:{message.author.public_hash} -> {message.content}")
 			self.on_ready_function = on_ready_function
 			self.on_message_function = on_message_function
 
