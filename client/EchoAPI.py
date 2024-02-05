@@ -6,6 +6,7 @@ import hashlib
 import requests
 import pickle
 import PQCryptoLayer as crypto
+import SymetricEncryptionLayer as SEL
 import copy
 import asyncio
 import base64
@@ -93,7 +94,6 @@ class User:
 
 class client:
 	server_url = None #str
-	token = None #str
 	username = None #str
 	main_loop_delay = None #int/float
 	private_key = None #bytes
@@ -224,10 +224,15 @@ class client:
 			"private_key": self.private_key,
 			"public_sign": self.user.public_sign,
 			"private_sign": self.private_sign}
-		return pickle.dumps(data)
+		password_hash = hashlib.new("sha-256")
+		password_hash.update(self.password.encode("utf-8"))
+		return SEL.encrypt(password_hash.digest(), pickle.dumps(data))
 
-	def login(self, container):
-		data = pickle.loads(container) #not quite safest but should be trusted
+	def login(self, container, password):
+		password_hash = hashlib.new("sha-256")
+		password_hash.update(password.encode("utf-8"))
+
+		data = pickle.loads(SEL.decrypt(password_hash.digest(), container))
 		self.user = User(data["username"])
 
 		public_key = data["public_key"]
