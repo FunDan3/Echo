@@ -53,6 +53,8 @@ class Message:
 		if len(split_type) == 2: #if encoding is specified
 			encoding = split_type[1]
 			self.content = self.content.decode(encoding)
+		if json_data["public_hash"] != self.author.public_hash:
+			raise DeceptiveServerException(f"Server tried to spoof public key / sign of {message.author.username}")
 
 	def _decrypt_message(self, encrypted_message):
 		unverified_message = crypto.encryption.decrypt(self.parent.private_key, encrypted_message)
@@ -85,7 +87,7 @@ class User:
 			encoding = "utf-8"
 		if type(text)!=str:
 			raise TypeError(f"text type should be string. Got: {type(text)}")
-		json_data = json.dumps({"type": f"text/plain#{encoding}", "metadata": metadata})
+		json_data = json.dumps({"type": f"text/plain#{encoding}", "metadata": metadata, "public_hash": self.parent.user.public_hash})
 		to_send = json_data.encode("utf-8") + b"\n" + text.encode(encoding)
 		self.dm_raw_bytes(to_send)
 
