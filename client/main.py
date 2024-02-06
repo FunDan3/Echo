@@ -74,14 +74,12 @@ messages = read_message_file(client.password)
 
 async def console_prompt():
 	global messages
-	help_message = """
-help - see this menu
+	help_message = """help - see this menu
 exit - exit messager
 read <optional: quantity> - read <quantity> messages. if quantity isnt specified then all messages will be displayed
-profile <positional: username> - display username and publick hash of the user.
-message <positional: username> - start typing message to <username>. You should check recipient public hash using profile command to validate their identity.
-"""
+message <positional: username> - start typing a message to <username>."""
 	user_input = await aioconsole.ainput(f"{client.user.username}:{client.user.public_hash} > ")
+	print()
 	arguments = user_input.split(" ")
 	command = arguments[0]; arguments.pop(0)
 	if command not in "help;exit;read;profile;message".split(";"):
@@ -108,11 +106,11 @@ message <positional: username> - start typing message to <username>. You should 
 			except ValueError:
 				print("Argument 'quantity' should be integer")
 				return
-			if to_read > len(messages):
-				print("Quantity is bigger than message count")
-				return
-			if to_read <= 0:
-				return
+		if to_read > len(messages):
+			print("Quantity is bigger than message count")
+			return
+		if to_read <= 0:
+			return
 		print("-"*15)
 		for i in range(to_read):
 			print(f"from {messages[0].author.username}:{messages[0].author.public_hash}")
@@ -122,13 +120,32 @@ message <positional: username> - start typing message to <username>. You should 
 				print("-"*15)
 			messages.pop(0)
 		write_message_file(client.password, messages)
+	if command == "message":
+		if len(arguments)!=1:
+			print("Command 'message' takes exactly 1 positional argument")
+			return
+		user = EchoAPI.User(arguments[0])
+		print(f"Public hash of {user.username} is {user.public_hash}. Security advise: validate that user actually has this public hash. Otherwise your message might get read by server or third party.")
+		if await aioconsole.ainput("Is this right? (y/n): ") == "y":
+			message = ""
+			print(f"Everything you type to console is being recorded and will be sent to {user.username} after you are done. To send message type 'finish' on the new line")
+			while True:
+				line = await aioconsole.ainput("")
+				if line == "finish":
+					break
+				message += ("\n" if message else "") + line
+			user.dm_text(message)
+			print("Message have been sent")
+			return
+		else:
+			print("Message canceled")
+			return
 
 @client.event.on_ready()
 async def on_ready():
 	print("You are connected. Developer of this messager is a failure at GUIs so currently only console is supported\nTo see help type 'help'")
 	while True:
-		await asyncio.sleep(0.1)
-		print(f"You have {len(messages)} unread messages.")
+		print("\n" + f"You have {len(messages)} unread messages.")
 		await console_prompt()
 
 @client.event.on_message()

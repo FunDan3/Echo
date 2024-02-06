@@ -95,7 +95,7 @@ class User:
 class client:
 	server_url = None #str
 	username = None #str
-	main_loop_delay = None #int/float
+	message_loop_delay = None #int/float
 	private_key = None #bytes
 	private_sign = None #bytes
 	password = None #string
@@ -123,14 +123,14 @@ class client:
 				return _decorated_event
 			return init_wrapper
 
-	def __init__(self, server_url, main_loop_delay = 10):
+	def __init__(self, server_url, message_loop_delay = 1):
 		self.server_url = server_url + ("/" if not server_url.endswith("/") else "")
 		self.event = self.event(self)
 		if User.parent:
 			raise Exceptions.MultipleClientsLaunchedException("You can not run multiple clients at the same time")
 		User.parent = self
 		Message.parent = self
-		self.main_loop_delay = main_loop_delay
+		self.message_loop_delay = message_loop_delay
 
 	def verify_response(self, response):
 		if response.status_code not in range(200, 300):
@@ -252,7 +252,7 @@ class client:
 		while True:
 			for message in self.fetch_messages():
 				await self.event.on_message_function(message)
-			await asyncio.sleep(self.main_loop_delay)
+			await asyncio.sleep(self.message_loop_delay)
 
 	async def async_start(self):
 		await asyncio.gather(self.event.on_ready_function(), self.message_loop())
