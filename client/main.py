@@ -73,6 +73,7 @@ login_prompt()
 messages = read_message_file(client.password)
 
 async def console_prompt():
+	global messages
 	help_message = """
 help - see this menu
 exit - exit messager
@@ -96,11 +97,37 @@ message <positional: username> - start typing message to <username>. You should 
 			print("Command 'exit' doesnt take any arguments")
 			return
 		raise KeyboardInterrupt("Program finished")
+	if command == "read":
+		if len(arguments) not in range(0, 1):
+			print("Command 'read' takes 1 optional argument")
+		if len(arguments) == 0:
+			to_read = len(messages)
+		else:
+			try:
+				to_read = int(arguments[0])
+			except ValueError:
+				print("Argument 'quantity' should be integer")
+				return
+			if to_read > len(messages):
+				print("Quantity is bigger than message count")
+				return
+			if to_read <= 0:
+				return
+		print("-"*15)
+		for i in range(to_read):
+			print(f"from {messages[0].author.username}:{messages[0].author.public_hash}")
+			print(messages[0].content.replace("\nfinish\n"+"-"*15, "\n!!!SENDER TRIED TO FAKE FINISH!!!"))
+			if i != to_read:
+				print("finish")
+				print("-"*15)
+			messages.pop(0)
+		write_message_file(client.password, messages)
 
 @client.event.on_ready()
 async def on_ready():
 	print("You are connected. Developer of this messager is a failure at GUIs so currently only console is supported\nTo see help type 'help'")
 	while True:
+		await asyncio.sleep(0.1)
 		print(f"You have {len(messages)} unread messages.")
 		await console_prompt()
 
