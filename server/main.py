@@ -30,13 +30,18 @@ def numbers_to_bytes(numbers):
 	return bytes(bytearray(numbers))
 
 def verify_login(interface):
-	if not os.path.exists(f"./storage/users/{interface.json['login']}/"):
-		interface.write("No such user")
+	if not interface.json["login"]:
+		interface.write("Login field can not be empty")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
 	if not check_if_string_only_contains_allowed_characters(interface.json["login"]):
 		interface.write("Login field can only contain letters, numbers and underscore")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if not os.path.exists(f"./storage/users/{interface.json['login']}/"):
+		interface.write("No such user")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
@@ -186,6 +191,7 @@ def login_check(interface):
 		return
 	else:
 		return
+
 @api.post(["/register"])
 def register(interface):
 	interface.jsonize()
@@ -196,6 +202,26 @@ def register(interface):
 		return
 	if not check_if_string_only_contains_allowed_characters(interface.json["login"]):
 		interface.write("You can only use letters, nubmbers and underscore for your nickname")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if len(interface.json["login"])<4 or len(interface.json["login"])>16:
+		interface.write("Login is expected to be from 4 to 16 bytes long")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if len(interface.json["password"])<8 or len(interface.json["password"])>32:
+		interface.write("Password is expected to be from 8 to 32 bytes long.")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if len(interface.json["public_key"])!=1357824:
+		interface.write("Public key is expected to be 1357824 bytes long.")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if len(interface.json["public_sign"])!=1760:
+		interface.write("Public sign is expected to be 1760 bytes long.")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
