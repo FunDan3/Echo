@@ -215,13 +215,13 @@ def register(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if len(interface.json["public_key"])!=1357824:
-		interface.write("Public key is expected to be 1357824 bytes long.")
+	if len(interface.json["public_key"])!=800:
+		interface.write("Public key is expected to 800 bytes long.")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if len(interface.json["public_sign"])!=1760:
-		interface.write("Public sign is expected to be 1760 bytes long.")
+	if len(interface.json["public_sign"])!=2592:
+		interface.write("Public sign is expected to be 2592 bytes long.")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return

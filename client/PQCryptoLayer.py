@@ -1,30 +1,41 @@
 # This file provides layer for easy post quantum cipher and signs
 
-from pqcrypto.kem import mceliece8192128 as enc
-from pqcrypto.sign import dilithium4 as sig
 import SymetricEncryptionLayer as aes
+import oqs
+
+kem_algorithm = "Kyber512" # I have tried to reasearch what algoritms are good but I am too dumb to comperhend the papers so it is default one
+sig_algorithm = "Dilithium5" # Probably good. I dont think that signing is as important as encryption
 
 class encryption:
 	def generate_keypair():
-		return enc.generate_keypair()
+		with oqs.KeyEncapsulation(kem_algorithm) as encryptor:
+			public_key, private_key = encryptor.generate_keypair(), encryptor.export_secret_key()
+		return public_key, private_key
 	def encrypt(public_key, plaintext):
-		encrypted_key, plain_key = enc.encrypt(public_key)
+		with oqs.KeyEncapsulation(kem_algorithm) as encryptor:
+			encrypted_key, plain_key = encryptor.encap_secret(public_key)
 		ciphertext = aes.encrypt(plain_key, plaintext)
 		return encrypted_key+ciphertext
 	def decrypt(private_key, ciphertext):
-		encrypted_key = ciphertext[:240]
-		ciphertext = ciphertext[240:]
-		plain_key = enc.decrypt(private_key, encrypted_key)
+		encrypted_key = ciphertext[:768]
+		ciphertext = ciphertext[768:]
+		with oqs.KeyEncapsulation(kem_algorithm, private_key) as encryptor:
+			plain_key = encryptor.decap_secret(encrypted_key)
 		return aes.decrypt(plain_key, ciphertext)
 
 class signing:
 	def generate_signs():
-		return sig.generate_keypair()
+		with oqs.Signature(sig_algorithm) as signer:
+			public_sign, private_sign = signer.generate_keypair(), signer.export_secret_key()
+		return public_sign, private_sign
 	def sign(private_sign, message):
-		signature = sig.sign(private_sign, message)
+		with oqs.Signature(sig_algorithm, private_sign) as signer:
+			signature = signer.sign(message)
+		print(len(signature))
 		return signature+message
 	def verify(public_sign, message):
-		signature = message[:3366]
-		message = message[3366:]
-		assert sig.verify(public_sign, message, signature)
+		signature = message[:4595]
+		message = message[4595:]
+		with oqs.Signature(sig_algorithm) as signer:
+			assert signer.verify(message, signature, public_sign)
 		return message
