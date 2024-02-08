@@ -72,6 +72,31 @@ def login_window():
 					except Exception as e:
 						window["-OUTPUT-"].update(str(e))
 		window.close()
+	else:
+		layout = [[sg.Text("Registration")],
+			  [sg.Text("Login:"), sg.Input(key = "-LOGIN-")],
+			  [sg.Text("Password:"), sg.Input(key = "-PASSWORD-")],
+			  [sg.Text(key = "-OUTPUT-")],
+			  [sg.Button("Register")]]
+		window = sg.Window("Registration", layout)
+		while True:
+			event, values = window.read()
+			if event == sg.WINDOW_CLOSED:
+				raise KeyboardInterrupt("Program finish")
+			if event == "Register":
+				try:
+					if os.path.exists("./cryptodata.pickle"):
+						with open("./cryptodata.pickle", "rb") as cryptodata_file:
+							client.register(values["-LOGIN-"], values["-PASSWORD-"], pickle.loads(cryptodata_file.read()))
+							break
+					else:
+						client.register(values["-LOGIN-"], values["-PASSWORD-"])
+						break
+				except Exception as e:
+					window["-OUTPUT-"].update(str(e))
+		window.close()
+		with open("./container.epickle", "wb") as container_file:
+			container_file.write(client.generate_container())
 def login_prompt():
 	banner_window()
 	login_window()
