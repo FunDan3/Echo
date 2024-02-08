@@ -102,18 +102,18 @@ def login_prompt():
 	login_window()
 
 async def main_window():
-	previous_user_name = None
+	previous_user_name = " "
 	message_tab = [[sg.Text("User:", size = (10, 1)), sg.Input(key = "-USER-")],
 		       [sg.Text("", key = "-PUBLIC_HASH-")],
 		       [sg.Multiline(key = "-MESSAGE-", size = (70, 10))],
 		       [sg.Button("Send")]]
-	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab)]])]]
+	inbox_tab = [[sg.Text("", size = (70, 20), key = "-INBOX-")]]
+	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab), sg.Tab("Inbox", inbox_tab)]])]]
 	window = sg.Window("Echo messager", layout)
 	window.NonBlocking = True
 	while True:
 		event, values = window.read(timeout = 0)
-		if event == sg.WINDOW_CLOSED:
-			raise KeyboardInterrupt("Program finished")
+		window["-INBOX-"].update(inbox_value)
 		if values["-USER-"] != previous_user_name:
 			previous_user_name = values["-USER-"]
 			try:
@@ -121,21 +121,28 @@ async def main_window():
 				window["-PUBLIC_HASH-"].update(user.public_hash)
 			except Exception as e:
 				window["-PUBLIC_HASH-"].update(str(e))
-		await asyncio.sleep(1/30)
+		if event == sg.WINDOW_CLOSED:
+			raise KeyboardInterrupt("Program finished")
 		if event == "Send":
 			try:
 				user = EchoAPI.User(values["-USER-"])
-				user.dm_text(values["-MESSAGE-"])
-				window["-MESSAGE-"].update("")
-				window["-USER-"].update("")
-				window["-PUBLIC_HASH-"].update("Message have been sent")
-				previous_user_name = ""
 			except Exception as e:
-				pass
+				continue
+			user.dm_text(values["-MESSAGE-"])
+			window["-MESSAGE-"].update("")
+			window["-USER-"].update("")
+			window["-PUBLIC_HASH-"].update("Message have been sent")
+			previous_user_name = ""
+		await asyncio.sleep(1/30)
 	window.close()
 
 login_prompt()
-#messages = read_message_file(client.password)
+inbox_value = "-"*15+"\n"
+
+@client.event.on_message()
+async def on_message(message):
+	global inbox_value
+	inbox_value = "-"*15+"\n"+f"from {message.author.username}:{message.author.public_hash}"+"\n"+message.content.replace("-"*15, "")+"\n"+inbox_value
 
 @client.event.on_ready()
 async def on_ready():
