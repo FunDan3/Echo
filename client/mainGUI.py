@@ -74,15 +74,15 @@ def login_window():
 		window.close()
 	else:
 		layout = [[sg.Text("Registration")],
-			  [sg.Text("Login:"), sg.Input(key = "-LOGIN-")],
-			  [sg.Text("Password:"), sg.Input(key = "-PASSWORD-")],
+			  [sg.Text("Login:", size=(10,1)), sg.Input(key = "-LOGIN-")],
+			  [sg.Text("Password:", size=(10,1)), sg.Input(key = "-PASSWORD-")],
 			  [sg.Text(key = "-OUTPUT-")],
 			  [sg.Button("Register")]]
 		window = sg.Window("Registration", layout)
 		while True:
 			event, values = window.read()
 			if event == sg.WINDOW_CLOSED:
-				raise KeyboardInterrupt("Program finish")
+				raise KeyboardInterrupt("Program finished")
 			if event == "Register":
 				try:
 					if os.path.exists("./cryptodata.pickle"):
@@ -101,15 +101,44 @@ def login_prompt():
 	banner_window()
 	login_window()
 
+async def main_window():
+	previous_user_name = None
+	message_tab = [[sg.Text("User:", size = (10, 1)), sg.Input(key = "-USER-")],
+		       [sg.Text("", key = "-PUBLIC_HASH-")],
+		       [sg.Multiline(key = "-MESSAGE-", size = (70, 10))],
+		       [sg.Button("Send")]]
+	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab)]])]]
+	window = sg.Window("Echo messager", layout)
+	window.NonBlocking = True
+	while True:
+		event, values = window.read(timeout = 0)
+		if event == sg.WINDOW_CLOSED:
+			raise KeyboardInterrupt("Program finished")
+		if values["-USER-"] != previous_user_name:
+			previous_user_name = values["-USER-"]
+			try:
+				user = EchoAPI.User(values["-USER-"])
+				window["-PUBLIC_HASH-"].update(user.public_hash)
+			except Exception as e:
+				window["-PUBLIC_HASH-"].update(str(e))
+		await asyncio.sleep(1/30)
+		if event == "Send":
+			try:
+				user = EchoAPI.User(values["-USER-"])
+				user.dm_text(values["-MESSAGE-"])
+				window["-MESSAGE-"].update("")
+				window["-USER-"].update("")
+				window["-PUBLIC_HASH-"].update("Message have been sent")
+				previous_user_name = ""
+			except Exception as e:
+				pass
+	window.close()
+
 login_prompt()
 #messages = read_message_file(client.password)
 
 @client.event.on_ready()
 async def on_ready():
-	pass
-
-@client.event.on_message()
-async def on_message(message):
-	pass
+	await main_window()
 
 client.start()

@@ -143,7 +143,7 @@ def send_algorithms(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if not os.path.exists(f"./storage/users/{interface.json['username']}/"):
+	if not os.path.exists(f"./storage/users/{interface.json['username']}/data.json"):
 		interface.write("This user does not exist")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
@@ -164,7 +164,7 @@ def send_public_key(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if not os.path.exists(f"./storage/users/{interface.json['username']}/"):
+	if not os.path.exists(f"./storage/users/{interface.json['username']}/public.key"):
 		interface.write("This user does not exist")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
@@ -179,7 +179,7 @@ def send_public_key(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
-	if not os.path.exists(f"./storage/users/{interface.json['username']}/"):
+	if not os.path.exists(f"./storage/users/{interface.json['username']}/public.sign"):
 		interface.write("This user does not exist")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
