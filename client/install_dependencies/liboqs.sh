@@ -1,9 +1,6 @@
 #! /usr/bin/bash
 # This script was created thanks to neomn's answer to https://github.com/kpdemetriou/pqcrypto/issues/10
 
-#Determine python3 version
-python_version=$(./python_version.sh)
-
 #Install requierments
 sudo apt install git libssl-dev cmake gcc -y
 
@@ -14,9 +11,13 @@ cmake --build liboqs/build --parallel 16
 sudo cmake --build liboqs/build --target install
 
 #Add library path
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 
 #Install python wrapper
 git clone --depth=1 https://github.com/open-quantum-safe/liboqs-python
 cd liboqs-python
 pip install .
+
+#clean up
+rm -rf ./liboqs/
+rm -rf ./liboqs-python/
