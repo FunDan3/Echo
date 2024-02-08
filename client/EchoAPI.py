@@ -58,8 +58,8 @@ class Message:
 			raise DeceptiveServerException(f"Server tried to spoof public key / sign of {message.author.username}")
 
 	def _decrypt_message(self, encrypted_message):
-		unverified_message = crypto.encryption.decrypt(self.parent.private_key, encrypted_message)
-		verified_message = crypto.signing.verify(self.author.public_sign, unverified_message)
+		unverified_message = crypto.encryption.decrypt(self.parent.private_key, encrypted_message, algorithm = self.author.kem_algorithm)
+		verified_message = crypto.signing.verify(self.author.public_sign, unverified_message, algorithm = self.author.sig_algorithm)
 		return verified_message
 
 class User:
@@ -68,29 +68,45 @@ class User:
 	public_key = None
 	public_sign = None
 	public_hash = None
+	kem_algorithm = None
+	sig_algorithm = None
 	def __init__(self, username):
 		self.username = username
 		self.public_key = self.parent.basic_request_get("public_key", json_data = {"username": username}).content
 		self.public_sign = self.parent.basic_request_get("public_sign", json_data = {"username": username}).content
+		algorithms = json.loads(self.parent.basic_request_get("algorithms", json_data = {"username": username}).content)
+		self.kem_algorithm = algorithms["kem_algorithm"]
+		self.sig_algorithm = algorithms["sig_algorithm"]
 		public_hash = hashlib.new("md5")
 		public_hash.update(self.public_key)
 		public_hash.update(self.public_sign)
 		self.public_hash = base64.b64encode(public_hash.digest()).decode("utf-8").replace("=", "")
 
-	def dm_raw_bytes(self, raw_data):
-		to_send = crypto.encryption.encrypt(self.public_key, crypto.signing.sign(self.parent.private_sign, raw_data))
+	def _dm_raw_bytes(self, raw_data):
+		to_send = crypto.encryption.encrypt(self.public_key, crypto.signing.sign(self.parent.private_sign, raw_data, algorithm = self.parent.user.sig_algorithm), algorithm = self.parent.user.kem_algorithm)
 		self.parent.auth_request_post("message", json_data = {"recipient": self.username}, data = to_send)
 
-	def dm_text(self, text, encoding = None, metadata = None):
+	def _dm_standartized(self, data, message_type, metadata = None, encoding = None):
 		if not metadata:
 			metadata = {}
 		if not encoding:
+			encoding = ""
+		if type(data) not in [str, bytes]:
+			raise TypeError(f"data type should be string or bytes. Got: {type(text)}")
+		if type(data) == str:
+			data = data.encode(encoding)
+		if encoding:
+			encoding = "#" + encoding
+		json_data = json.dumps({"type": f"{message_type}{encoding}", "metadata": metadata, "public_hash": self.parent.user.public_hash})
+		to_send = json_data.encode("utf-8") + b"\n" + data
+		self._dm_raw_bytes(to_send)
+
+	def dm_text(self, text, encoding = None, metadata = None):
+		if type(text) not in [str, bytes]:
+			text = str(text)
+		if not encoding and type(text) == str:
 			encoding = "utf-8"
-		if type(text)!=str:
-			raise TypeError(f"text type should be string. Got: {type(text)}")
-		json_data = json.dumps({"type": f"text/plain#{encoding}", "metadata": metadata, "public_hash": self.parent.user.public_hash})
-		to_send = json_data.encode("utf-8") + b"\n" + text.encode(encoding)
-		self.dm_raw_bytes(to_send)
+		self._dm_standartized(text, "text/plain", encoding = encoding, metadata = metadata)
 
 class client:
 	server_url = None #str
@@ -164,41 +180,24 @@ class client:
 		self.verify_response(response)
 		return response
 
-	def generate_keys(self, condition):
-		while True:
-			public_key, private_key = crypto.encryption.generate_keypair()
-			if condition(public_key, private_key):
-				return public_key, private_key
-
-	def generate_signs(self, condition):
-		while True:
-			public_sign, private_sign = crypto.signing.generate_signs()
-			if condition(public_sign, private_sign):
-				return public_sign, private_sign
-
-	def generate_cryptodata(self, key_condition = None, sign_condition = None, overall_condition = None):
-		anything = lambda *args, **kwargs: True
-		if not key_condition:
-			key_condition = anything
-		if not sign_condition:
-			sign_condition = anything
-		if not overall_condition:
-			overall_condition = anything
-		while True:
-			public_key, private_key = self.generate_keys(key_condition)
-			public_sign, private_sign = self.generate_signs(sign_condition)
-			if overall_condition(public_key, private_key, public_sign, private_sign):
-				return public_key, private_key, public_sign, private_sign
+	def generate_cryptodata(self, kem_algorithm = None, sig_algorithm = None):
+		kem_algorithm = crypto.default_kem_algorithm if not kem_algorithm else kem_algorithm
+		sig_algorithm = crypto.default_sig_algorithm if not sig_algorithm else sig_algorithm
+		public_key, private_key = crypto.encryption.generate_keypair(algorithm = kem_algorithm)
+		public_sign, private_sign = crypto.signing.generate_signs(algorithm = sig_algorithm)
+		return public_key, private_key, public_sign, private_sign, kem_algorithm, sig_algorithm
 
 	def register(self, username, password, cryptodata = None):
 		if not cryptodata:
 			cryptodata = self.generate_cryptodata()
-		public_key, self.private_key, public_sign, self.private_sign = cryptodata
+		public_key, self.private_key, public_sign, self.private_sign, kem_algorithm, sig_algorithm = cryptodata
 		self.password = password
 		self.basic_request_post("register", json_data = {"login": username,
 			"password": password,
 			"public_key": bytes_to_numbers(public_key),
-			"public_sign": bytes_to_numbers(public_sign)}).content.decode("utf-8")
+			"public_sign": bytes_to_numbers(public_sign),
+			"kem_algorithm": kem_algorithm,
+			"sig_algorithm": sig_algorithm}).content.decode("utf-8")
 		self.user = User(username)
 		return self.generate_container()
 
@@ -223,7 +222,9 @@ class client:
 			"public_key": self.user.public_key,
 			"private_key": self.private_key,
 			"public_sign": self.user.public_sign,
-			"private_sign": self.private_sign}
+			"private_sign": self.private_sign,
+			"kem_algorithm": self.user.kem_algorithm,
+			"sig_algorithm": self.user.sig_algorithm}
 		password_hash = hashlib.new("sha-256")
 		password_hash.update(self.password.encode("utf-8"))
 		return SEL.encrypt(password_hash.digest(), pickle.dumps(data))

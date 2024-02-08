@@ -7,6 +7,7 @@ import hashlib
 import os
 import time
 import json
+import oqs
 
 allowed_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
 
@@ -130,6 +131,27 @@ def banner(interface):
 	interface.write(BannerContent)
 	interface.finish(200)
 
+@api.get(["/algorithms"])
+def send_algorithms(interface):
+	if not interface.verify(["username"]):
+		interface.write("Invalid request. Expected fields: 'username'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	if not check_if_string_only_contains_allowed_characters(interface.json["username"]):
+		interface.write("Username contains invalid characters")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if not os.path.exists(f"./storage/users/{interface.json['username']}/"):
+		interface.write("This user does not exist")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	user_config = DictLayer(f"./storage/users/{interface.json['username']}/data.json", autowrite = False)
+	interface.write(json.dumps({"kem_algorithm": user_config["kem_algorithm"], "sig_algorithm": user_config["sig_algorithm"]}))
+	interface.finish(200)
+
 @api.get(["/public_key"])
 def send_public_key(interface):
 	if not interface.verify(["username"]):
@@ -137,13 +159,13 @@ def send_public_key(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
-	if not os.path.exists(f"./storage/users/{interface.json['username']}/"):
-		interface.write("This user does not exist")
+	if not check_if_string_only_contains_allowed_characters(interface.json["username"]):
+		interface.write("Username contains invalid characters")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if not check_if_string_only_contains_allowed_characters(interface.json["username"]):
-		interface.write("Username contains invalid characters")
+	if not os.path.exists(f"./storage/users/{interface.json['username']}/"):
+		interface.write("This user does not exist")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
@@ -195,8 +217,8 @@ def login_check(interface):
 @api.post(["/register"])
 def register(interface):
 	interface.jsonize()
-	if not interface.verify(["login", "password", "public_key", "public_sign"]):
-		interface.write("Invalid request. Expected fields: 'login', 'password', 'public_key', 'public_sign'")
+	if not interface.verify(["login", "password", "public_key", "public_sign", "kem_algorithm", "sig_algorithm"]):
+		interface.write("Invalid request. Expected fields: 'login', 'password', 'public_key', 'public_sign', 'kem_algorithm', 'sig_algorithm'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -215,13 +237,27 @@ def register(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if len(interface.json["public_key"])!=800:
-		interface.write("Public key is expected to 800 bytes long.")
+	if interface.json["kem_algorithm"] not in oqs.get_enabled_kem_mechanisms():
+		interface.write(f"Server does not know {interface.json['kem_algorithm']}. Make sure that this encryption algorithm exists. If it does then server is outdated")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if len(interface.json["public_sign"])!=2592:
-		interface.write("Public sign is expected to be 2592 bytes long.")
+	if interface.json["sig_algorithm"] not in oqs.get_enabled_sig_mechanisms():
+		interface.write(f"Server does not know {interface.json['sig_algorithm']}. Make sure that this signing algorithm exists. If it does then server is outdated")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	with oqs.KeyEncapsulation(interface.json["kem_algorithm"]) as encryption:
+		key_size = encryption.details["length_public_key"]
+	with oqs.Signature(interface.json["sig_algorithm"]) as signing:
+		sign_size = signing.details["length_public_key"]
+	if len(interface.json["public_key"])!=key_size:
+		interface.write(f"Public key is expected to {key_size} bytes long.")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	if len(interface.json["public_sign"])!=sign_size:
+		interface.write(f"Public sign is expected to be {sig_size} bytes long.")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
@@ -233,7 +269,13 @@ def register(interface):
 	password_hash = hashlib.sha512()
 	password_hash.update(f"{interface.json['login']}{interface.json['password']}".encode("utf-8"))
 	password_hash = password_hash.hexdigest()
-	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json", template = {"LastLogin": time.time(), "IpList": [interface.client_address.ip], "uid": user_data["last_uid"], "PublicMetadata": {}, "PrivateMetadata": {}, "DataSent": 0})
+	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json",
+				template = {"LastLogin": time.time(),
+					"IpList": [interface.client_address.ip],
+					"uid": user_data["last_uid"],
+					"kem_algorithm": interface.json["kem_algorithm"],
+					"sig_algorithm": interface.json["sig_algorithm"],
+					"DataSent": 0})
 	user_config.save()
 	message_config = DictLayer(f"./storage/users/{interface.json['login']}/inbox/messages.json", template = {"LastMID": 0, "MessagesMetadata": {}})
 	message_config.save()
