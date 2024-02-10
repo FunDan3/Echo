@@ -16,6 +16,22 @@ import json
 program_version = "0.0.1"
 program_flavour = "vanilla"
 
+settings = None
+
+def read_settings():
+	global settings
+	try:
+		with open("./settings.json", "rb") as f:
+			settings = json.loads(f.read())
+	except Exception:
+		print("Settings file is corrupted or doesnt exist. Resetting them")
+		settings = {"DefaultConnect": "", "DontShowBannersOn": []}
+		write_settings()
+
+def write_settings(): #settings are probably not worth encrypting
+	with open("./settings.json", "wb") as f:
+		f.write(json.dumps(settings).encode("utf-8"))
+
 def hash(data, algorithm = None):
 	if not algorithm:
 		algorithm = "sha256"
@@ -45,15 +61,21 @@ def write_message_file(password, messages_list):
 			raise e
 
 def banner_window(client):
+	global settings
+	if client.server_url in settings["DontShowBannersOn"]:
+		return
 	sg.theme("DarkAmber")
 	layout = [[sg.Text(client.read_banner())],
-		  [sg.Button("Ok")]]
+		  [sg.Button("Ok"), sg.Checkbox("Dont show banner from this server ever again", default = False, key = "-DONT_SHOW-")]]
 	window = sg.Window("Banner", layout)
 	while True:
 		event, values = window.read()
 		if event == sg.WINDOW_CLOSED:
 			raise KeyboardInterrupt("Program finished")
 		if event == "Ok":
+			if values["-DONT_SHOW-"]:
+				settings["DontShowBannersOn"].append(client.server_url)
+				write_settings()
 			break
 	window.close()
 
@@ -102,6 +124,7 @@ def login_window(client):
 		window.close()
 		with open("./container.epickle", "wb") as container_file:
 			container_file.write(client.generate_container())
+
 def login_prompt(client):
 	banner_window(client)
 	login_window(client)
@@ -186,6 +209,7 @@ def connect_window():
 	window.close()
 
 def main():
+	read_settings()
 	ip = connect_window()
 	client = EchoAPI.client(ip)
 
