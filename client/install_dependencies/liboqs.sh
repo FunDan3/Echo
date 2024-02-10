@@ -17,7 +17,3 @@ echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib" >> ~/.bashrc
 git clone --depth=1 https://github.com/open-quantum-safe/liboqs-python
 cd liboqs-python
 pip install .
-
-#clean up
-rm -rf ./liboqs/
-rm -rf ./liboqs-python/
