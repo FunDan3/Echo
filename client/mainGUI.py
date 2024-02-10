@@ -9,6 +9,12 @@ import os
 import asyncio
 import hashlib
 import aioconsole
+import requests
+import time
+import json
+
+program_version = "0.0.1"
+program_flavour = "vanilla"
 
 def hash(data, algorithm = None):
 	if not algorithm:
@@ -37,9 +43,8 @@ def write_message_file(password, messages_list):
 		except KeyboardInterrupt as e:
 			print("Saving message file. Please wait")
 			raise e
-client = EchoAPI.client("http://127.0.0.1:8080")
 
-def banner_window():
+def banner_window(client):
 	sg.theme("DarkAmber")
 	layout = [[sg.Text(client.read_banner())],
 		  [sg.Button("Ok")]]
@@ -52,7 +57,7 @@ def banner_window():
 			break
 	window.close()
 
-def login_window():
+def login_window(client):
 	sg.theme("DarkAmber")
 	if os.path.exists("./container.epickle"):
 		layout = [[sg.Text("Container found. Please enter password to decrypt it")],
@@ -97,9 +102,9 @@ def login_window():
 		window.close()
 		with open("./container.epickle", "wb") as container_file:
 			container_file.write(client.generate_container())
-def login_prompt():
-	banner_window()
-	login_window()
+def login_prompt(client):
+	banner_window(client)
+	login_window(client)
 
 async def main_window():
 	previous_user_name = " "
@@ -113,6 +118,8 @@ async def main_window():
 	window.NonBlocking = True
 	while True:
 		event, values = window.read(timeout = 0)
+		if event == sg.WINDOW_CLOSED:
+			raise KeyboardInterrupt("Program finished")
 		window["-INBOX-"].update(inbox_value)
 		if values["-USER-"] != previous_user_name:
 			previous_user_name = values["-USER-"]
@@ -121,8 +128,6 @@ async def main_window():
 				window["-PUBLIC_HASH-"].update(user.public_hash)
 			except Exception as e:
 				window["-PUBLIC_HASH-"].update(str(e))
-		if event == sg.WINDOW_CLOSED:
-			raise KeyboardInterrupt("Program finished")
 		if event == "Send":
 			try:
 				user = EchoAPI.User(values["-USER-"])
@@ -136,16 +141,70 @@ async def main_window():
 		await asyncio.sleep(1/30)
 	window.close()
 
-login_prompt()
-inbox_value = "-"*15+"\n"
+def connect_window():
+	sg.theme("DarkAmber")
+	layout = [[sg.Text("Please choose the server to connect to. If you are uncertain leave default one")],
+		  [sg.Input("foxomet.ru", key = "-SERVER_ADDRESS-")],
+		  [sg.Text(key = "-OUTPUT-")],
+		  [sg.Button("Connect", key = "-CONNECT_BUTTON-", visible = False)]]
+	window = sg.Window("Connect", layout)
+	previous_server = ""
+	while True:
+		event, values = window.read(timeout = 0)
+		time_started = time.time()
+		if event == sg.WINDOW_CLOSED:
+			raise KeyboardInterrupt("Program finished")
+		try:
+			server = f"http://{values['-SERVER_ADDRESS-']}:22389/"
+			if server != previous_server and values["-SERVER_ADDRESS-"]:
+				previous_server = server
+				try:
+					server_response = requests.get(server+"echo-messager-server-info", timeout = 0.5)
+				except requests.exceptions.ConnectionError as e:
+					raise Exception("Connection failed")
+				if server_response.status_code != 200:
+					raise Exception(f"Server returned http status code {server_response.status_code}")
+				server_data = json.loads(server_response.content)
+				window["-OUTPUT-"].update("Server detected")
+				if server_data["flavour"] != program_flavour:
+					raise Exception(f"Server has {server_data['flavour']} which doesnt match with client flavour ({program_flavour})")
+				if server_data["version"] != program_version:
+					window["-OUTPUT-"].update(f"Server version is {server_data['version']} but client version is {program_version}")
+					window["-CONNECT_BUTTON-"].update("Connect anyways", visible = True)
+				else:
+					window["-OUTPUT-"].update(f"Server is 100% comatible")
+					window["-CONNECT_BUTTON-"].update("Connect", visible = True)
+		except Exception as e:
+			window["-OUTPUT-"].update(str(e))
+			window["-CONNECT_BUTTON-"].update(visible = False)
+		if event == "-CONNECT_BUTTON-":
+			window.close()
+			return server
+		to_sleep = 1/30 - (time.time() - time_started)
+		if to_sleep > 0:
+			time.sleep(to_sleep)
+	window.close()
 
-@client.event.on_message()
-async def on_message(message):
-	global inbox_value
-	inbox_value = "-"*15+"\n"+f"from {message.author.username}:{message.author.public_hash}"+"\n"+message.content.replace("-"*15, "")+"\n"+inbox_value
+def main():
+	ip = connect_window()
+	client = EchoAPI.client(ip)
 
-@client.event.on_ready()
-async def on_ready():
-	await main_window()
+	@client.event.on_message()
+	async def on_message(message):
+		global inbox_value
+		inbox_value = "-"*15+"\n"+f"from {message.author.username}:{message.author.public_hash}"+"\n"+message.content.replace("-"*15, "")+"\n"+inbox_value
 
-client.start()
+	@client.event.on_ready()
+	async def on_ready():
+		await main_window()
+
+	login_prompt(client)
+	inbox_value = "-"*15+"\n"
+	client.start()
+
+
+if __name__ == "__main__":
+	try:
+		main()
+	except KeyboardInterrupt:
+		pass
