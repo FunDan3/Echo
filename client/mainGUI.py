@@ -178,12 +178,13 @@ def connect_window():
 		if event == sg.WINDOW_CLOSED:
 			raise KeyboardInterrupt("Program finished")
 		try:
-			server = f"http://{values['-SERVER_ADDRESS-']}:22389/"
+			server = f"https://{values['-SERVER_ADDRESS-']}:22389/"
 			if server != previous_server and values["-SERVER_ADDRESS-"]:
 				previous_server = server
 				try:
 					server_response = requests.get(server+"echo-messager-server-info", timeout = 0.5)
 				except requests.exceptions.ConnectionError as e:
+					print(e)
 					raise Exception("Connection failed")
 				if server_response.status_code != 200:
 					raise Exception(f"Server returned http status code {server_response.status_code}")
