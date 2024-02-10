@@ -64,7 +64,7 @@ def get_min_time_key(message_dict):
 			return_value = (message_key, message_dict[message_key]["time"])
 	return return_value[0]
 
-config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 22389})
+config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 22389, "CertificatePath": "", "KeyPath": ""})
 user_data = DictLayer("./storage/users/user_data.json", template = {"last_uid": 0, "password_hashes": {}})
 BannerContent = ReadFile("./banner.txt")
 
@@ -293,4 +293,6 @@ def register(interface):
 	user_data["last_uid"] = user_data["last_uid"] + 1
 	user_data.save()
 	interface.finish(200)
+if config["CertificatePath"] and config["KeyPath"]:
+	api.convert_to_ssl(config["CertificatePath"], config["KeyPath"])
 api.start()
