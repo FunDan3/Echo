@@ -66,8 +66,10 @@ def get_min_time_key(message_dict):
 
 config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 22389, "CertificatePath": "", "KeyPath": ""})
 user_data = DictLayer("./storage/users/user_data.json", template = {"last_uid": 0, "password_hashes": {}})
-BannerContent = ReadFile("./banner.txt")
-
+if os.path.exists("./banner.txt"):
+	BannerContent = ReadFile("./banner.txt")
+else:
+	BannerContent = "Unconfigured server"
 
 api = WebServer(config["Host"], config["Port"])
 
