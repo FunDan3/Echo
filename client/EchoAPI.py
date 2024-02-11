@@ -9,7 +9,9 @@ import PQCryptoLayer as crypto
 import SymetricEncryptionLayer as SEL
 import copy
 import asyncio
+import aiohttp
 import base64
+
 
 class Exceptions:
 	class EventCallException(Exception):
@@ -20,6 +22,7 @@ class Exceptions:
 		pass
 	class MultipleClientsLaunchedException(Exception):
 		pass
+
 def _decorated_event(*args, **kwargs):
 	raise EventCallException(f"Functions decorated by class.event is not supposed to be called")
 
@@ -40,10 +43,13 @@ class Message:
 	metadata = None
 	def __init__(self, server_response_content):
 		json_data = json.loads(server_response_content.split(b"\n", 1)[0])
-		message_data = server_response_content.split(b"\n", 1)[1]
+		self.content = server_response_content.split(b"\n", 1)[1]
 		self.sent_time = json_data["time"]
 		self.author = User(json_data["Sender"])
-		self.retrieve_content(self._decrypt_message(message_data))
+
+	async def load(self):
+		await self.author.load()
+		self.retrieve_content(self._decrypt_message(self.content))
 
 	def retrieve_content(self, data):
 		json_data = json.loads(data.split(b"\n", 1)[0])
@@ -72,9 +78,12 @@ class User:
 	sig_algorithm = None
 	def __init__(self, username):
 		self.username = username
-		self.public_key = self.parent.basic_request_get("public_key", json_data = {"username": username}).content
-		self.public_sign = self.parent.basic_request_get("public_sign", json_data = {"username": username}).content
-		algorithms = json.loads(self.parent.basic_request_get("algorithms", json_data = {"username": username}).content)
+
+	async def load(self):
+		self.public_key, self.public_sign, algorithms = await asyncio.gather(self.parent.basic_request_get("public_key", json_data = {"username": self.username}),
+			self.parent.basic_request_get("public_sign", json_data = {"username": self.username}),
+			self.parent.basic_request_get("algorithms", json_data = {"username": self.username}))
+		algorithms = json.loads(algorithms)
 		self.kem_algorithm = algorithms["kem_algorithm"]
 		self.sig_algorithm = algorithms["sig_algorithm"]
 		public_hash = hashlib.new("md5")
@@ -82,11 +91,11 @@ class User:
 		public_hash.update(self.public_sign)
 		self.public_hash = base64.b64encode(public_hash.digest()).decode("utf-8").replace("=", "")
 
-	def _dm_raw_bytes(self, raw_data):
+	async def _dm_raw_bytes(self, raw_data):
 		to_send = crypto.encryption.encrypt(self.public_key, crypto.signing.sign(self.parent.private_sign, raw_data, algorithm = self.parent.user.sig_algorithm), algorithm = self.parent.user.kem_algorithm)
-		self.parent.auth_request_post("message", json_data = {"recipient": self.username}, data = to_send)
+		await self.parent.auth_request_post("message", json_data = {"recipient": self.username}, data = to_send)
 
-	def _dm_standartized(self, data, message_type, metadata = None, encoding = None):
+	async def _dm_standartized(self, data, message_type, metadata = None, encoding = None):
 		if not metadata:
 			metadata = {}
 		if not encoding:
@@ -99,14 +108,14 @@ class User:
 			encoding = "#" + encoding
 		json_data = json.dumps({"type": f"{message_type}{encoding}", "metadata": metadata, "public_hash": self.parent.user.public_hash})
 		to_send = json_data.encode("utf-8") + b"\n" + data
-		self._dm_raw_bytes(to_send)
+		await self._dm_raw_bytes(to_send)
 
-	def dm_text(self, text, encoding = None, metadata = None):
+	async def dm_text(self, text, encoding = None, metadata = None):
 		if type(text) not in [str, bytes]:
 			text = str(text)
 		if not encoding and type(text) == str:
 			encoding = "utf-8"
-		self._dm_standartized(text, "text/plain", encoding = encoding, metadata = metadata)
+		await self._dm_standartized(text, "text/plain", encoding = encoding, metadata = metadata)
 
 class client:
 	server_url = None #str
@@ -148,37 +157,51 @@ class client:
 		Message.parent = self
 		self.message_loop_delay = message_loop_delay
 
-	def verify_response(self, response):
-		if response.status_code not in range(200, 300):
-			raise Exceptions.InvalidRequestException(response.content.decode("utf-8"))
+	async def verify_response(self, response):
+		if response.status not in range(200, 300):
+			ErrorData = await response.read()
+			raise Exceptions.InvalidRequestException(ErrorData.decode("utf-8"))
 
-	def basic_request_post(self, path, json_data = None, data = None):
+	async def basic_request_post(self, path, json_data = None, data = None, session = None):
 		if not json_data:
 			json_data = {}
 		if not data:
 			data = b""
 		to_send = json.dumps(json_data).encode("utf-8") + b"\n" + data
-		response = requests.post(self.server_url + path, data = to_send)
-		self.verify_response(response)
-		return response
+		if session:
+			async with session.post(self.server_url + path, data = to_send) as response:
+				await self.verify_response(response)
+				return await response.read()
 
-	def auth_request_post(self, path, json_data = None, data = None):
+		else:
+			async with aiohttp.ClientSession(timeout = 0.5) as session:
+				async with session.post(self.server_url + path, data = to_send) as response:
+					await self.verify_response(response)
+					return await response.read()
+
+	async def auth_request_post(self, path, json_data = None, data = None, session = None):
 		if not json_data:
 			json_data = {}
 		json_data["login"] = self.user.username
 		json_data["password"] = self.password
-		return self.basic_request_post(path, json_data, data)
+		return await self.basic_request_post(path, json_data, data, session)
 
-	def basic_request_get(self, path, json_data = None):
+	async def basic_request_get(self, path, json_data = None, session = None):
 		if not json_data:
 			json_data = {}
 		first = True
 		for key, value in json_data.items():
 			path += ("?" if first else "&") + f"{key}={value}"
 			first = False
-		response = requests.get(self.server_url + path)
-		self.verify_response(response)
-		return response
+		if session:
+			async with session.get(self.server_url + path) as response:
+				await self.verify_response(response)
+				return await response.read()
+		else:
+			async with aiohttp.ClientSession(timeout = 0.5) as session:
+				async with session.get(self.server_url + path) as response:
+					await self.verify_response(response)
+					return await response.read()
 
 	def generate_cryptodata(self, kem_algorithm = None, sig_algorithm = None):
 		kem_algorithm = crypto.default_kem_algorithm if not kem_algorithm else kem_algorithm
@@ -187,30 +210,32 @@ class client:
 		public_sign, private_sign = crypto.signing.generate_signs(algorithm = sig_algorithm)
 		return public_key, private_key, public_sign, private_sign, kem_algorithm, sig_algorithm
 
-	def register(self, username, password, cryptodata = None):
+	async def register(self, username, password, cryptodata = None):
 		if not cryptodata:
 			cryptodata = self.generate_cryptodata()
 		public_key, self.private_key, public_sign, self.private_sign, kem_algorithm, sig_algorithm = cryptodata
 		self.password = password
-		self.basic_request_post("register", json_data = {"login": username,
+		await self.basic_request_post("register", json_data = {"login": username,
 			"password": password,
 			"public_key": bytes_to_numbers(public_key),
 			"public_sign": bytes_to_numbers(public_sign),
 			"kem_algorithm": kem_algorithm,
-			"sig_algorithm": sig_algorithm}).content.decode("utf-8")
+			"sig_algorithm": sig_algorithm})
 		self.user = User(username)
+		await self.user.load()
 		return self.generate_container()
 
-	def fetch_message(self):
-		server_response = self.auth_request_post("fetch_message").content
+	async def fetch_message(self):
+		server_response = await self.auth_request_post("fetch_message")
 		if not server_response:
 			return None
-		return Message(server_response)
-
-	def fetch_messages(self):
+		message = Message(server_response)
+		await message.load()
+		return message
+	async def fetch_messages(self):
 		collected_messages = []
 		while True:
-			message = self.fetch_message()
+			message = await self.fetch_message()
 			if not message:
 				break
 			collected_messages.append(message)
@@ -229,12 +254,13 @@ class client:
 		password_hash.update(self.password.encode("utf-8"))
 		return SEL.encrypt(password_hash.digest(), pickle.dumps(data))
 
-	def login(self, container, password):
+	async def login(self, container, password):
 		password_hash = hashlib.new("sha-256")
 		password_hash.update(password.encode("utf-8"))
 
 		data = pickle.loads(SEL.decrypt(password_hash.digest(), container))
 		self.user = User(data["username"])
+		await self.user.load()
 
 		public_key = data["public_key"]
 		public_sign = data["public_sign"]
@@ -244,14 +270,15 @@ class client:
 		self.password = data["password"]
 		self.private_key = data["private_key"]
 		self.private_sign = data["private_sign"]
-		login_request = self.auth_request_post("login")
+		login_request = await self.auth_request_post("login")
 
-	def read_banner(self):
-		return self.basic_request_get("banner.txt").content.decode("utf-8")
+	async def read_banner(self):
+		banner = await self.basic_request_get("banner.txt")
+		return banner.decode("utf-8")
 
 	async def message_loop(self):
 		while True:
-			for message in self.fetch_messages():
+			for message in await self.fetch_messages():
 				await self.event.on_message_function(message)
 			await asyncio.sleep(self.message_loop_delay)
 

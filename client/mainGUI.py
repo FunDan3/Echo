@@ -9,7 +9,7 @@ import os
 import asyncio
 import hashlib
 import aioconsole
-import requests
+import aiohttp
 import time
 import json
 
@@ -60,12 +60,12 @@ def write_message_file(password, messages_list):
 			print("Saving message file. Please wait")
 			raise e
 
-def banner_window(client):
+async def banner_window(client):
 	global settings
 	if client.server_url in settings["DontShowBannersOn"]:
 		return
 	sg.theme("DarkAmber")
-	layout = [[sg.Text(client.read_banner())],
+	layout = [[sg.Text(await client.read_banner())],
 		  [sg.Button("Ok"), sg.Checkbox("Dont show banner from this server ever again", default = False, key = "-DONT_SHOW-")]]
 	window = sg.Window("Banner", layout)
 	while True:
@@ -79,7 +79,7 @@ def banner_window(client):
 			break
 	window.close()
 
-def login_window(client):
+async def login_window(client):
 	sg.theme("DarkAmber")
 	if os.path.exists("./container.epickle"):
 		layout = [[sg.Text("Container found. Please enter password to decrypt it")],
@@ -94,7 +94,7 @@ def login_window(client):
 			if event == "Ok":
 				with open("./container.epickle", "rb") as container_file:
 					try:
-						client.login(container_file.read(), values["-PASSWORD-"])
+						await client.login(container_file.read(), values["-PASSWORD-"])
 						break
 					except Exception as e:
 						window["-OUTPUT-"].update(str(e))
@@ -114,10 +114,10 @@ def login_window(client):
 				try:
 					if os.path.exists("./cryptodata.pickle"):
 						with open("./cryptodata.pickle", "rb") as cryptodata_file:
-							client.register(values["-LOGIN-"], values["-PASSWORD-"], pickle.loads(cryptodata_file.read()))
+							await client.register(values["-LOGIN-"], values["-PASSWORD-"], pickle.loads(cryptodata_file.read()))
 							break
 					else:
-						client.register(values["-LOGIN-"], values["-PASSWORD-"])
+						await client.register(values["-LOGIN-"], values["-PASSWORD-"])
 						break
 				except Exception as e:
 					window["-OUTPUT-"].update(str(e))
@@ -125,16 +125,16 @@ def login_window(client):
 		with open("./container.epickle", "wb") as container_file:
 			container_file.write(client.generate_container())
 
-def login_prompt(client):
-	banner_window(client)
-	login_window(client)
+async def login_prompt(client):
+	await banner_window(client)
+	await login_window(client)
 
 async def main_window():
 	previous_user_name = " "
 	message_tab = [[sg.Text("User:", size = (10, 1)), sg.Input(key = "-USER-")],
 		       [sg.Text("", key = "-PUBLIC_HASH-")],
 		       [sg.Multiline(key = "-MESSAGE-", size = (70, 10))],
-		       [sg.Button("Send")]]
+		       [sg.Button("Send", key = "-SEND-", visible = False)]]
 	inbox_tab = [[sg.Text("", size = (70, 20), key = "-INBOX-")]]
 	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab), sg.Tab("Inbox", inbox_tab)]])]]
 	window = sg.Window("Echo messager", layout)
@@ -148,23 +148,25 @@ async def main_window():
 			previous_user_name = values["-USER-"]
 			try:
 				user = EchoAPI.User(values["-USER-"])
+				await user.load()
 				window["-PUBLIC_HASH-"].update(user.public_hash)
+				window["-SEND-"].update(visible = True)
 			except Exception as e:
+				window["-SEND-"].update(visible = False)
 				window["-PUBLIC_HASH-"].update(str(e))
-		if event == "Send":
-			try:
-				user = EchoAPI.User(values["-USER-"])
-			except Exception as e:
-				continue
-			user.dm_text(values["-MESSAGE-"])
+		if event == "-SEND-":
+			user = EchoAPI.User(values["-USER-"])
+			await user.load()
+			await user.dm_text(values["-MESSAGE-"])
 			window["-MESSAGE-"].update("")
 			window["-USER-"].update("")
 			window["-PUBLIC_HASH-"].update("Message have been sent")
+			window["-SEND-"].update(visible = False)
 			previous_user_name = ""
 		await asyncio.sleep(1/30)
 	window.close()
 
-def connect_window():
+async def connect_window():
 	global settings
 	sg.theme("DarkAmber")
 	if settings["DefaultConnect"]:
@@ -184,14 +186,13 @@ def connect_window():
 			server = f"https://{values['-SERVER_ADDRESS-']}:22389/"
 			if server != previous_server and values["-SERVER_ADDRESS-"]:
 				previous_server = server
-				try:
-					server_response = requests.get(server+"echo-messager-server-info", timeout = 0.5)
-				except requests.exceptions.ConnectionError as e:
-					print(e)
-					raise Exception("Connection failed")
-				if server_response.status_code != 200:
+				async with aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(0.5)) as session:
+					async with session.get(server+"echo-messager-server-info") as response:
+						server_status = response.status
+						server_response = await response.read()
+				if server_status != 200:
 					raise Exception(f"Server returned http status code {server_response.status_code}")
-				server_data = json.loads(server_response.content)
+				server_data = json.loads(server_response)
 				window["-OUTPUT-"].update("Server detected")
 				if server_data["flavour"] != program_flavour:
 					raise Exception(f"Server has {server_data['flavour']} which doesnt match with client flavour ({program_flavour})")
@@ -218,9 +219,9 @@ def connect_window():
 			time.sleep(to_sleep)
 	window.close()
 
-def main():
+async def main():
 	read_settings()
-	ip = connect_window()
+	ip = await connect_window()
 	client = EchoAPI.client(ip)
 
 	@client.event.on_message()
@@ -232,13 +233,13 @@ def main():
 	async def on_ready():
 		await main_window()
 
-	login_prompt(client)
-	client.start()
+	await login_prompt(client)
+	await client.async_start()
 
 
 if __name__ == "__main__":
 	inbox_value = "-"*15+"\n"
 	try:
-		main()
+		asyncio.run(main())
 	except KeyboardInterrupt:
 		pass
