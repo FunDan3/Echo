@@ -133,6 +133,8 @@ async def main_window():
 	previous_user_name = " "
 	message_tab = [[sg.Text("User:", size = (10, 1)), sg.Input(key = "-USER-")],
 		       [sg.Text("", key = "-PUBLIC_HASH-")],
+		       [sg.Text("", key = "-KEM_ALGO-")],
+		       [sg.Text("", key = "-SIG_ALGO-")],
 		       [sg.Multiline(key = "-MESSAGE-", size = (70, 10))],
 		       [sg.Button("Send", key = "-SEND-", visible = False)]]
 	inbox_tab = [[sg.Text("", size = (70, 20), key = "-INBOX-")]]
@@ -150,9 +152,13 @@ async def main_window():
 				user = EchoAPI.User(values["-USER-"])
 				await user.load()
 				window["-PUBLIC_HASH-"].update(user.public_hash)
+				window["-KEM_ALGO-"].update(user.kem_algorithm, visible = True)
+				window["-SIG_ALGO-"].update(user.sig_algorithm, visible = True)
 				window["-SEND-"].update(visible = True)
 			except Exception as e:
 				window["-SEND-"].update(visible = False)
+				window["-KEM_ALGO-"].update(visible = False)
+				window["-SIG_ALGO-"].update(visible = False)
 				window["-PUBLIC_HASH-"].update(str(e))
 		if event == "-SEND-":
 			user = EchoAPI.User(values["-USER-"])
@@ -162,6 +168,9 @@ async def main_window():
 			window["-USER-"].update("")
 			window["-PUBLIC_HASH-"].update("Message have been sent")
 			window["-SEND-"].update(visible = False)
+			window["-KEM_ALGO-"].update(visible = False)
+			window["-SIG_ALGO-"].update(visible = False)
+
 			previous_user_name = ""
 		await asyncio.sleep(1/30)
 	window.close()

@@ -174,7 +174,7 @@ class client:
 				return await response.read()
 
 		else:
-			async with aiohttp.ClientSession(timeout = 0.5) as session:
+			async with aiohttp.ClientSession() as session:
 				async with session.post(self.server_url + path, data = to_send) as response:
 					await self.verify_response(response)
 					return await response.read()
@@ -198,7 +198,7 @@ class client:
 				await self.verify_response(response)
 				return await response.read()
 		else:
-			async with aiohttp.ClientSession(timeout = 0.5) as session:
+			async with aiohttp.ClientSession() as session:
 				async with session.get(self.server_url + path) as response:
 					await self.verify_response(response)
 					return await response.read()
