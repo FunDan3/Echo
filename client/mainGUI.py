@@ -194,7 +194,7 @@ async def connect_window():
 			server = f"https://{values['-SERVER_ADDRESS-']}:22389/"
 			if server != previous_server and values["-SERVER_ADDRESS-"]:
 				previous_server = server
-				async with aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(0.5)) as session:
+				async with aiohttp.ClientSession(timeout = aiohttp.ClientTimeout(1)) as session:
 					async with session.get(server+"echo-messager-server-info") as response:
 						server_status = response.status
 						server_response = await response.read()
