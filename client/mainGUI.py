@@ -8,7 +8,6 @@ import pickle
 import os
 import asyncio
 import hashlib
-import aioconsole
 import aiohttp
 import time
 import json
