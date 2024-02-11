@@ -165,11 +165,14 @@ async def main_window():
 	window.close()
 
 def connect_window():
+	global settings
 	sg.theme("DarkAmber")
+	if settings["DefaultConnect"]:
+		return settings["DefaultConnect"]
 	layout = [[sg.Text("Please choose the server to connect to. If you are uncertain leave default one")],
 		  [sg.Input("foxomet.ru", key = "-SERVER_ADDRESS-")],
 		  [sg.Text(key = "-OUTPUT-")],
-		  [sg.Button("Connect", key = "-CONNECT_BUTTON-", visible = False)]]
+		  [sg.Button("Connect", key = "-CONNECT_BUTTON-", visible = False), sg.Checkbox("Connect to this server automatically", default = True, key = "-AUTOCONNECT-")]]
 	window = sg.Window("Connect", layout)
 	previous_server = ""
 	while True:
@@ -195,13 +198,19 @@ def connect_window():
 				if server_data["version"] != program_version:
 					window["-OUTPUT-"].update(f"Server version is {server_data['version']} but client version is {program_version}")
 					window["-CONNECT_BUTTON-"].update("Connect anyways", visible = True)
+					window["-AUTOCONNECT-"].update(visible = True)
 				else:
 					window["-OUTPUT-"].update(f"Server is 100% comatible")
 					window["-CONNECT_BUTTON-"].update("Connect", visible = True)
+					window["-AUTOCONNECT-"].update(visible = True)
 		except Exception as e:
 			window["-OUTPUT-"].update(str(e))
 			window["-CONNECT_BUTTON-"].update(visible = False)
+			window["-AUTOCONNECT-"].update(visible = False)
 		if event == "-CONNECT_BUTTON-":
+			if values["-AUTOCONNECT-"]:
+				settings["DefaultConnect"] = server
+				write_settings()
 			window.close()
 			return server
 		to_sleep = 1/30 - (time.time() - time_started)
@@ -224,11 +233,11 @@ def main():
 		await main_window()
 
 	login_prompt(client)
-	inbox_value = "-"*15+"\n"
 	client.start()
 
 
 if __name__ == "__main__":
+	inbox_value = "-"*15+"\n"
 	try:
 		main()
 	except KeyboardInterrupt:
