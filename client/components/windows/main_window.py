@@ -22,9 +22,11 @@ async def loop(client, inbox_value):
 		       [sg.Multiline(key = "-MESSAGE-", size = (70, 10))],
 		       [sg.Button("Send", key = "-SEND-", visible = False)]]
 	inbox_tab = [[sg.Text("", size = (70, 20), key = "-INBOX-")]]
-	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab), sg.Tab("Inbox", inbox_tab)]])]]
+	account_tab = [[sg.Button("Delete my account", key = "-DELETE-")]]
+	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab), sg.Tab("Inbox", inbox_tab), sg.Tab("Account", account_tab)]])]]
 	window = sg.Window("Echo messager", layout)
 	window.NonBlocking = True
+	FirstAccountDeletePush = True
 	while True:
 		event, values = window.read(timeout = 0)
 		if event == sg.WINDOW_CLOSED:
@@ -45,6 +47,16 @@ async def loop(client, inbox_value):
 				window["-PUBLIC_HASH-"].update(str(e))
 		else:
 			await asyncio.sleep(1/30)
+		if event == "-DELETE-":
+			if FirstAccountDeletePush:
+				window["-DELETE-"].update("REALLY delete my account")
+				FirstAccountDeletePush = False
+			else:
+				await client.delete()
+				os.remove("./container.epickle")
+				raise KeyboardInterrupt("Program finished")
+		if event == "REALLY delete my account":
+			await client.delete()
 		if event == "-SEND-":
 			user = await client.fetch_user(values["-USER-"])
 			await user.dm_text(values["-MESSAGE-"])

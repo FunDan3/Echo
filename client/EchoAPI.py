@@ -203,6 +203,10 @@ class client:
 					await self.verify_response(response)
 					return await response.read()
 
+	async def delete(self):
+		await self.auth_request_post("delete")
+		del self
+
 	def generate_cryptodata(self, kem_algorithm = None, sig_algorithm = None):
 		kem_algorithm = crypto.default_kem_algorithm if not kem_algorithm else kem_algorithm
 		sig_algorithm = crypto.default_sig_algorithm if not sig_algorithm else sig_algorithm
@@ -223,7 +227,6 @@ class client:
 			"sig_algorithm": sig_algorithm})
 		self.user = User(username)
 		await self.user.load()
-		return self.generate_container()
 
 	async def fetch_user(self, username):
 		user = User(username)
