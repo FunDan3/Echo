@@ -5,8 +5,8 @@ import json
 import hashlib
 import requests
 import pickle
-import PQCryptoLayer as crypto
-import SymetricEncryptionLayer as SEL
+import components.cryptography.PQCryptoLayer as crypto
+import components.cryptography.SymetricEncryptionLayer as SEL
 import copy
 import asyncio
 import aiohttp
@@ -225,6 +225,11 @@ class client:
 		await self.user.load()
 		return self.generate_container()
 
+	async def fetch_user(self, username):
+		user = User(username)
+		await user.load()
+		return user
+
 	async def fetch_message(self):
 		server_response = await self.auth_request_post("fetch_message")
 		if not server_response:
@@ -232,6 +237,7 @@ class client:
 		message = Message(server_response)
 		await message.load()
 		return message
+
 	async def fetch_messages(self):
 		collected_messages = []
 		while True:
