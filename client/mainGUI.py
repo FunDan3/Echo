@@ -1,5 +1,5 @@
 #! /usr/bin/python3
-
+# To install pysimplegui for windows use pip3 install "pysimplegui<5.0.0" due to some licensing.
 import EchoAPI
 import components.cryptography.SymetricEncryptionLayer as SEL
 from components import common

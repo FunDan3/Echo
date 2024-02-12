@@ -18,8 +18,7 @@ def patch_oqs_lib(path):
 import warnings"""
 	fixed_import_snippet = """import sys
 import os
-import warnings
-"""
+import warnings"""
 	original_code_snippet = '''def _load_shared_obj(name):
     """Attempts to load native OQS library."""
     paths = []
@@ -84,7 +83,26 @@ def compile_for_linux():
 	remove("./mainGUI.spec")
 	remove("./build")
 	remove("./__pycache__")
+def compile_for_windows():
+	python_lib_path = os.path.expanduser(f"~\\AppData\\Roaming\\Python\\Python{sys.version_info.major}{sys.version_info.minor}\\site-packages\\")
+	oqs_path = python_lib_path + "oqs\\oqs.py"
+	print(oqs_path)
+	patch_oqs_lib(oqs_path)
+	try:
+		remove("./dist/")
+	except Exception:
+		pass
+	os.system("pyinstaller --onefile --windowed mainGUI.py")
+	with open("liboqs.dll", "rb") as read:
+		with open("dist\\liboqs.dll", "wb") as write:
+			write.write(read.read())
+	remove("./mainGUI.spec")
+	remove("./build")
+	remove("./__pycache__")
+
 
 if __name__ == "__main__":
 	if os.name == "posix":
 		compile_for_linux()
+	if os.name == "nt":
+		compile_for_windows()
