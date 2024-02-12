@@ -11,6 +11,15 @@ import oqs
 
 allowed_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_"
 
+def delete_r(path):
+	if os.path.isdir(path):
+		path = path + ("/" if not path.endswith("/") else "")
+		files = os.listdir(path)
+		for file in files:
+			delete_r(path + file)
+		os.rmdir(path)
+	else:
+		os.remove(path)
 def check_if_string_only_contains_allowed_characters(string_to_check):
 	total_count = 0
 	for allowed_character in allowed_characters:
@@ -65,7 +74,7 @@ def get_min_time_key(message_dict):
 	return return_value[0]
 
 config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 22389, "CertificatePath": "", "KeyPath": ""})
-user_data = DictLayer("./storage/users/user_data.json", template = {"last_uid": 0, "password_hashes": {}})
+user_data = DictLayer("./storage/users/user_data.json", template = {"password_hashes": {}})
 if os.path.exists("./banner.txt"):
 	BannerContent = ReadFile("./banner.txt")
 else:
@@ -75,7 +84,7 @@ api = WebServer(config["Host"], config["Port"])
 
 @api.get("/echo-messager-server-info")
 def send_server_info(interface):
-	return_data = {"version": "0.0.1",
+	return_data = {"version": "0.0.2",
 	"flavour": "vanilla"}
 	interface.write(json.dumps(return_data))
 	interface.header("Content-Type", "text/json")
@@ -224,6 +233,21 @@ def login_check(interface):
 	else:
 		return
 
+@api.post(["/delete"])
+def delete_user(interface):
+	interface.jsonize()
+	if not interface.verify(["login", "password"]):
+		interface.write("Invalid request. Expected fields: 'login', 'password'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	if not verify_login(interface):
+		return
+	delete_r(f"./storage/users/{interface.json['login']}/")
+	del user_data["password_hashes"][interface.json["login"]]
+	user_data.save()
+	interface.finish(200)
+
 @api.post(["/register"])
 def register(interface):
 	interface.jsonize()
@@ -282,7 +306,6 @@ def register(interface):
 	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json",
 				template = {"LastLogin": time.time(),
 					"IpList": [interface.client_address.ip],
-					"uid": user_data["last_uid"],
 					"kem_algorithm": interface.json["kem_algorithm"],
 					"sig_algorithm": interface.json["sig_algorithm"],
 					"DataSent": 0})
@@ -292,7 +315,6 @@ def register(interface):
 	WriteFile(f"./storage/users/{interface.json['login']}/public.key", numbers_to_bytes(interface.json["public_key"]))
 	WriteFile(f"./storage/users/{interface.json['login']}/public.sign", numbers_to_bytes(interface.json["public_sign"]))
 	user_data["password_hashes"][interface.json["login"]] = password_hash
-	user_data["last_uid"] = user_data["last_uid"] + 1
 	user_data.save()
 	interface.finish(200)
 if config["CertificatePath"] and config["KeyPath"]:
