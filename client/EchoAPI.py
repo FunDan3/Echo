@@ -11,6 +11,7 @@ import copy
 import asyncio
 import aiohttp
 import base64
+import random
 
 
 class Exceptions:
@@ -22,6 +23,13 @@ class Exceptions:
 		pass
 	class MultipleClientsLaunchedException(Exception):
 		pass
+
+def generate_token():
+	token = ""
+	characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()_+="
+	for _ in range(random.randint(8, 32)):
+		token += random.choice(characters)
+	return token
 
 def _decorated_event(*args, **kwargs):
 	raise EventCallException(f"Functions decorated by class.event is not supposed to be called")
@@ -123,7 +131,9 @@ class client:
 	message_loop_delay = None #int/float
 	private_key = None #bytes
 	private_sign = None #bytes
+	container_password = None
 	password = None #string
+	token = None
 	user = None
 	class event:
 		on_ready_function = None
@@ -156,6 +166,7 @@ class client:
 		User.parent = self
 		Message.parent = self
 		self.message_loop_delay = message_loop_delay
+		self.token = generate_token()
 
 	async def verify_response(self, response):
 		if response.status not in range(200, 300):
@@ -183,7 +194,7 @@ class client:
 		if not json_data:
 			json_data = {}
 		json_data["login"] = self.user.username
-		json_data["password"] = self.password
+		json_data["password"] = self.token
 		return await self.basic_request_post(path, json_data, data, session)
 
 	async def basic_request_get(self, path, json_data = None, session = None):
@@ -220,7 +231,7 @@ class client:
 		public_key, self.private_key, public_sign, self.private_sign, kem_algorithm, sig_algorithm = cryptodata
 		self.password = password
 		await self.basic_request_post("register", json_data = {"login": username,
-			"password": password,
+			"password": self.token,
 			"public_key": bytes_to_numbers(public_key),
 			"public_sign": bytes_to_numbers(public_sign),
 			"kem_algorithm": kem_algorithm,
@@ -252,7 +263,7 @@ class client:
 
 	def generate_container(self):
 		data = {"username": self.user.username,
-			"password": self.password,
+			"password": self.token,
 			"public_key": self.user.public_key,
 			"private_key": self.private_key,
 			"public_sign": self.user.public_sign,
@@ -276,7 +287,7 @@ class client:
 		if public_key != self.user.public_key or public_sign != self.user.public_sign:
 			raise Exceptions.DeceptiveServerException("Server's response to public key/sign doesnt match recorded one")
 
-		self.password = data["password"]
+		self.token = data["password"]
 		self.private_key = data["private_key"]
 		self.private_sign = data["private_sign"]
 		login_request = await self.auth_request_post("login")
