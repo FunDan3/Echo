@@ -13,6 +13,20 @@ import time
 import json
 from .. import common
 
+async def password_change(client):
+	layout = [[sg.Input(key = "-PASSWORD-")],
+		  [sg.Button("Ok", key = "-CHANGE-")]]
+	window = sg.Window("Change password", layout)
+	while True:
+		event, values = window.read(timeout = 0)
+		if event == "-CHANGE-":
+			client.password = values["-PASSWORD-"]
+			with open("container.epickle", "wb") as f:
+				f.write(client.generate_container())
+			break
+		await asyncio.sleep(1/30)
+	window.close()
+
 async def loop(client, inbox_value):
 	previous_user_name = " "
 	message_tab = [[sg.Text("User:", size = (10, 1)), sg.Input(key = "-USER-")],
@@ -22,10 +36,10 @@ async def loop(client, inbox_value):
 		       [sg.Multiline(key = "-MESSAGE-", size = (70, 10))],
 		       [sg.Button("Send", key = "-SEND-", visible = False)]]
 	inbox_tab = [[sg.Text("", size = (70, 20), key = "-INBOX-")]]
-	account_tab = [[sg.Button("Delete my account", key = "-DELETE-")]]
+	account_tab = [[sg.Button("Delete my account", key = "-DELETE-")],
+		       [sg.Button("Change container password", key = "-CHANGE_PASSWORD-")]]
 	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab), sg.Tab("Inbox", inbox_tab), sg.Tab("Account", account_tab)]])]]
 	window = sg.Window("Echo messager", layout)
-	window.NonBlocking = True
 	FirstAccountDeletePush = True
 	while True:
 		event, values = window.read(timeout = 0)
@@ -47,6 +61,8 @@ async def loop(client, inbox_value):
 				window["-PUBLIC_HASH-"].update(str(e))
 		else:
 			await asyncio.sleep(1/30)
+		if event == "-CHANGE_PASSWORD-":
+			await password_change(client)
 		if event == "-DELETE-":
 			if FirstAccountDeletePush:
 				window["-DELETE-"].update("REALLY delete my account")
@@ -55,8 +71,6 @@ async def loop(client, inbox_value):
 				await client.delete()
 				os.remove("./container.epickle")
 				raise KeyboardInterrupt("Program finished")
-		if event == "REALLY delete my account":
-			await client.delete()
 		if event == "-SEND-":
 			user = await client.fetch_user(values["-USER-"])
 			await user.dm_text(values["-MESSAGE-"])
