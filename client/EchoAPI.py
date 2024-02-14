@@ -274,6 +274,15 @@ class client:
 		password_hash.update(self.password.encode("utf-8"))
 		return SEL.encrypt(password_hash.digest(), pickle.dumps(data))
 
+	def is_valid_container(self, container, password):
+		try:
+			password_hash = hashlib.new("sha-256")
+			password_hash.update(password.encode("utf-8"))
+			data = pickle.loads(SEL.decrypt(password_hash.digest(), container))
+			return "yes"
+		except Exception as e:
+			return str(e)
+
 	async def login(self, container, password):
 		password_hash = hashlib.new("sha-256")
 		password_hash.update(password.encode("utf-8"))

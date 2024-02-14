@@ -1,5 +1,6 @@
 import PySimpleGUI as sg
 import os
+import asyncio
 from .. import common
 
 async def loop(client):
@@ -8,19 +9,31 @@ async def loop(client):
 		layout = [[sg.Text("Container found. Please enter password to decrypt it")],
 			  [sg.Input(key = "-PASSWORD-")],
 			  [sg.Text(key = "-OUTPUT-")],
-			  [sg.Button("Ok")]]
+			  [sg.Button("Ok", key = "-LOGIN_BUTTON-", visible = False)]]
 		window = sg.Window("Login", layout)
+		previous_password = None
+		with open("./container.epickle", "rb") as container_file:
+			container_content = container_file.read()
 		while True:
-			event, values = window.read()
+			event, values = window.read(timeout = 0)
 			if event == sg.WINDOW_CLOSED:
 				raise KeyboardInterrupt("Program finished")
-			if event == "Ok":
-				with open("./container.epickle", "rb") as container_file:
+			if previous_password!=values["-PASSWORD-"]:
+				previous_password = values["-PASSWORD-"]
+				validated = client.is_valid_container(container_content, values["-PASSWORD-"])
+				if validated == "yes":
+					window["-OUTPUT-"].update("Container decrypted. You can log in now.")
+					window["-LOGIN_BUTTON-"].update(visible = True)
+				else:
+					window["-OUTPUT-"].update(validated)
+					window["-LOGIN_BUTTON-"].update(visible = False)
+			if event == "-LOGIN_BUTTON-":
 					try:
-						await client.login(container_file.read(), values["-PASSWORD-"])
+						await client.login(container_content, values["-PASSWORD-"])
 						break
 					except Exception as e:
 						window["-OUTPUT-"].update(str(e))
+			await asyncio.sleep(1/30)
 		window.close()
 	else:
 		layout = [[sg.Text("Registration")],
