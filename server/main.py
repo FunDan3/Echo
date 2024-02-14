@@ -55,13 +55,13 @@ def verify_login(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	password_hash = hashlib.sha512()
-	password_hash.update(f"{interface.json['login']}{interface.json['password']}".encode("utf-8"))
-	password_hash = password_hash.hexdigest()
-	if password_hash == user_data["password_hashes"][interface.json["login"]]: #it is probably safe...
+	token_hash = hashlib.sha512()
+	token_hash.update(f"{interface.json['login']}{interface.json['token']}".encode("utf-8"))
+	token_hash = token_hash.hexdigest()
+	if token_hash == user_data["token_hashes"][interface.json["login"]]: #it is probably safe...
 		return True
 	else:
-		interface.write("Invalid password")
+		interface.write("Invalid token")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
@@ -74,7 +74,7 @@ def get_min_time_key(message_dict):
 	return return_value[0]
 
 config = DictLayer("./storage/config.json", template = {"Host": "", "Port": 22389, "CertificatePath": "", "KeyPath": ""})
-user_data = DictLayer("./storage/users/user_data.json", template = {"password_hashes": {}})
+user_data = DictLayer("./storage/users/user_data.json", template = {"token_hashes": {}})
 if os.path.exists("./banner.txt"):
 	BannerContent = ReadFile("./banner.txt")
 else:
@@ -95,8 +95,8 @@ def fetch_message(interface):
 	def sort_key(item):
 		return item["time"]
 	interface.jsonize()
-	if not interface.verify(["login", "password"]):
-		interface.write("Invalid request. Expected fields: 'login', 'password'")
+	if not interface.verify(["login", "token"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -120,8 +120,8 @@ def fetch_message(interface):
 @api.post("/message")
 def message(interface):
 	interface.jsonize()
-	if not interface.verify(["login", "password", "recipient"]):
-		interface.write("Invalid request. Expected fields: 'login', 'password', 'recipient'")
+	if not interface.verify(["login", "token", "recipient"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token', 'recipient'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -215,8 +215,8 @@ def send_public_key(interface):
 @api.post("/login")
 def login_check(interface):
 	interface.jsonize()
-	if not interface.verify(["login", "password"]):
-		interface.write("Invalid request. Expected fields: 'login', 'password'")
+	if not interface.verify(["login", "token"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -236,23 +236,23 @@ def login_check(interface):
 @api.post(["/delete"])
 def delete_user(interface):
 	interface.jsonize()
-	if not interface.verify(["login", "password"]):
-		interface.write("Invalid request. Expected fields: 'login', 'password'")
+	if not interface.verify(["login", "token"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
 	if not verify_login(interface):
 		return
 	delete_r(f"./storage/users/{interface.json['login']}/")
-	del user_data["password_hashes"][interface.json["login"]]
+	del user_data["token_hashes"][interface.json["login"]]
 	user_data.save()
 	interface.finish(200)
 
 @api.post(["/register"])
 def register(interface):
 	interface.jsonize()
-	if not interface.verify(["login", "password", "public_key", "public_sign", "kem_algorithm", "sig_algorithm"]):
-		interface.write("Invalid request. Expected fields: 'login', 'password', 'public_key', 'public_sign', 'kem_algorithm', 'sig_algorithm'")
+	if not interface.verify(["login", "token", "public_key", "public_sign", "kem_algorithm", "sig_algorithm"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token', 'public_key', 'public_sign', 'kem_algorithm', 'sig_algorithm'")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(400)
 		return
@@ -266,8 +266,8 @@ def register(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	if len(interface.json["password"])<8 or len(interface.json["password"])>32:
-		interface.write("Password is expected to be from 8 to 32 bytes long.")
+	if len(interface.json["token"])<8 or len(interface.json["token"])>32:
+		interface.write("token is expected to be from 8 to 32 bytes long.")
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
@@ -300,9 +300,9 @@ def register(interface):
 		interface.header("Content-Type", "text/plain")
 		interface.finish(401)
 		return
-	password_hash = hashlib.sha512()
-	password_hash.update(f"{interface.json['login']}{interface.json['password']}".encode("utf-8"))
-	password_hash = password_hash.hexdigest()
+	token_hash = hashlib.sha512()
+	token_hash.update(f"{interface.json['login']}{interface.json['token']}".encode("utf-8"))
+	token_hash = token_hash.hexdigest()
 	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json",
 				template = {"LastLogin": time.time(),
 					"IpList": [interface.client_address.ip],
@@ -314,7 +314,7 @@ def register(interface):
 	message_config.save()
 	WriteFile(f"./storage/users/{interface.json['login']}/public.key", numbers_to_bytes(interface.json["public_key"]))
 	WriteFile(f"./storage/users/{interface.json['login']}/public.sign", numbers_to_bytes(interface.json["public_sign"]))
-	user_data["password_hashes"][interface.json["login"]] = password_hash
+	user_data["token_hashes"][interface.json["login"]] = token_hash
 	user_data.save()
 	interface.finish(200)
 if config["CertificatePath"] and config["KeyPath"]:
