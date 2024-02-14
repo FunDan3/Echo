@@ -1,11 +1,12 @@
 import json
+import random
 def read_settings():
 	try:
 		with open("./settings.json", "rb") as f:
 			settings = json.loads(f.read())
 	except Exception:
 		print("Settings file is corrupted or doesnt exist. Resetting them")
-		settings = {"DefaultConnect": "", "DontShowBannersOn": []}
+		settings = {"DefaultConnect": "", "DontShowBannersOn": [], "AutoLogin": False}
 		write_settings(settings)
 	return settings
 
