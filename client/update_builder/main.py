@@ -38,18 +38,41 @@ def find_deleted_files(old_path_hash, new_path_hash):
 				to_remove.append(path)
 	return to_remove
 
+def find_changed_files(old_path_hash, new_path_hash):
+	changed_files = []
+	for path, data in old_path_hash.items():
+		if type(data) == bytes:
+			if path in new_path_hash:
+				if data != new_path_hash[path]:
+					changed_files.append(path)
+		else:
+			if path in new_path_hash:
+				changed_files += find_changed_files(old_path_hash[path], new_path_hash[path])
+	return changed_files
+
+def find_new_files(old_path_hash, new_path_hash):
+	new_files = []
+	for path, data in new_path_hash.items():
+		if type(data) == bytes:
+			if path not in old_path_hash:
+				new_files.append(path)
+		else:
+			if path in old_path_hash:
+				new_files += find_new_files(old_path_hash[path], new_path_hash[path])
+			else:
+				new_files.append(path)
+	return new_files
+
+
 def main(old_build_path, new_build_path):
 	old_build_path = old_build_path + ("/" if not old_build_path.endswith("/") else "")
 	new_build_path = new_build_path + ("/" if not new_build_path.endswith("/") else "")
 
 	old_file_hashes = hash_path(old_build_path)
 	new_file_hashes = hash_path(new_build_path)
-	#print(new_file_hashes)
 
 	to_remove = find_deleted_files(old_file_hashes, new_file_hashes)
-	print(to_remove)
-
-	to_overwrite = find_changed_files()
-	to_create = find_new_files()
+	to_overwrite = find_changed_files(old_file_hashes, new_file_hashes)
+	to_create = find_new_files(old_file_hashes, new_file_hashes)
 
 main("./old_release/", "./new_release/")
