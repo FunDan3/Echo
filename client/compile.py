@@ -72,7 +72,14 @@ def compile_for_linux():
 	python_lib_path = os.path.expanduser(f"~/.local/lib/python{sys.version_info.major}.{sys.version_info.minor}/site-packages/")
 	oqs_path = python_lib_path + "oqs/oqs.py"
 	patch_oqs_lib(oqs_path)
-	os.system("pyinstaller --onefile --windowed mainGUI.py") #nuitka seems to have hard time working with linux
+	try:
+		remove("./dist/")
+	except Exception:
+		pass
+	os.system("pyinstaller --windowed mainGUI.py") #nuitka seems to have hard time working with linux
+	os.rename("./dist/mainGUI/", "./dist.temp/")
+	remove("./dist/")
+	os.rename("./dist.temp/", "./dist/")
 	with open("/usr/local/lib/liboqs.so", "rb") as read:
 		with open("./dist/liboqs.so", "wb") as write:
 			write.write(read.read())
@@ -84,6 +91,10 @@ def compile_for_windows():
 	oqs_path = python_lib_path + "oqs\\oqs.py"
 	print(oqs_path)
 	patch_oqs_lib(oqs_path)
+	try:
+		remove("./dist/")
+	except Exception:
+		pass
 	os.system("nuitka --standalone --enable-plugin=tk-inter --disable-console mainGUI.py")
 	#liboqs is expected to be in the compilation folder by default
 	with open("liboqs.dll", "rb") as read:
