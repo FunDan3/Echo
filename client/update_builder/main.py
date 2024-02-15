@@ -60,7 +60,7 @@ def find_new_files(old_path_hash, new_path_hash):
 			if path in old_path_hash:
 				new_files += find_new_files(old_path_hash[path], new_path_hash[path])
 			else:
-				new_files.append(path)
+				new_files += find_new_files({}, new_path_hash[path])
 	return new_files
 
 def generate_script(to_remove, to_write):
@@ -85,6 +85,27 @@ def write(path, data):
 [write(path, update_files[path]) for path in {to_write}]"""
 	return script
 
+def read_files(files):
+	data = {}
+	for file in files:
+		with open(file, "rb") as f:
+			data[file] = f.read()
+	return data
+
+def create_update_package(scripts, update_files):
+	update_dict = {"scripts": scripts, "update_files": update_files}
+	return pickle.dumps(update_dict)
+
+def read_scripts():
+	scripts = {}
+	scripts_names = os.listdir("./scripts/")
+	for script_name in scripts_names:
+		script_path = f"./scripts/{script_name}"
+		script_name = os.path.splitext(script_name)[0]
+		with open(script_path, "r") as f:
+			scripts[script_name] = f.read()
+	return scripts
+
 def main(old_build_path, new_build_path):
 	old_build_path = old_build_path + ("/" if not old_build_path.endswith("/") else "")
 	new_build_path = new_build_path + ("/" if not new_build_path.endswith("/") else "")
@@ -94,7 +115,14 @@ def main(old_build_path, new_build_path):
 
 	to_remove = find_deleted_files(old_file_hashes, new_file_hashes)
 	to_write = find_changed_files(old_file_hashes, new_file_hashes) + find_new_files(old_file_hashes, new_file_hashes)
+	global_to_write = [file_path.replace("./", "./new_release/") for file_path in to_write]
 
-	script = generate_script(to_remove, to_write)
-
+	update_files = read_files(global_to_write)
+	scripts = read_scripts()
+	if "install" not in scripts:
+		install_script = generate_script(to_remove, to_write)
+		scripts["install"] = install_script
+	update_package = create_update_package(scripts, update_files)
+	with open("update.pickle", "wb") as f:
+		f.write(update_package)
 main("./old_release/", "./new_release/")
