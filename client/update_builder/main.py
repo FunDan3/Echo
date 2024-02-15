@@ -63,6 +63,27 @@ def find_new_files(old_path_hash, new_path_hash):
 				new_files.append(path)
 	return new_files
 
+def generate_script(to_remove, to_write):
+	script=f"""import os
+def remove(path):
+	if os.path.isdir(path):
+		path = path + ("/" if not path.endswith("/")) else ""
+		for file in os.listdir(path):
+			file_path = path+file
+			remove(file_path)
+		os.rmdir(path)
+	else:
+		os.remove(path)
+	print("removed " + path)
+
+def write(path, data):
+	with open(path, "wb") as f:
+		f.write(data)
+	print("written " + data)
+
+[remove(path) for path in {to_remove}]
+[write(path, update_files[path]) for path in {to_write}]"""
+	return script
 
 def main(old_build_path, new_build_path):
 	old_build_path = old_build_path + ("/" if not old_build_path.endswith("/") else "")
@@ -72,7 +93,8 @@ def main(old_build_path, new_build_path):
 	new_file_hashes = hash_path(new_build_path)
 
 	to_remove = find_deleted_files(old_file_hashes, new_file_hashes)
-	to_overwrite = find_changed_files(old_file_hashes, new_file_hashes)
-	to_create = find_new_files(old_file_hashes, new_file_hashes)
+	to_write = find_changed_files(old_file_hashes, new_file_hashes) + find_new_files(old_file_hashes, new_file_hashes)
+
+	script = generate_script(to_remove, to_write)
 
 main("./old_release/", "./new_release/")
