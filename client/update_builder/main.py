@@ -63,37 +63,15 @@ def find_new_files(old_path_hash, new_path_hash):
 				new_files += find_new_files({}, new_path_hash[path])
 	return new_files
 
-def generate_script(to_remove, to_write):
-	script=f"""import os
-def remove(path):
-	if os.path.isdir(path):
-		path = path + ("/" if not path.endswith("/")) else ""
-		for file in os.listdir(path):
-			file_path = path+file
-			remove(file_path)
-		os.rmdir(path)
-	else:
-		os.remove(path)
-	print("removed " + path)
-
-def write(path, data):
-	with open(path, "wb") as f:
-		f.write(data)
-	print("written " + data)
-
-[remove(path) for path in {to_remove}]
-[write(path, update_files[path]) for path in {to_write}]"""
-	return script
-
 def read_files(files):
 	data = {}
 	for file in files:
 		with open(file, "rb") as f:
-			data[file] = f.read()
+			data[file.replace("./new_release/", "./")] = f.read()
 	return data
 
-def create_update_package(scripts, update_files):
-	update_dict = {"scripts": scripts, "update_files": update_files}
+def create_update_package(scripts, update_files, to_remove, to_write):
+	update_dict = {"scripts": scripts, "update_files": update_files, "to_remove": to_remove, "to_write": to_write}
 	return pickle.dumps(update_dict)
 
 def read_scripts():
@@ -119,10 +97,7 @@ def main(old_build_path, new_build_path):
 
 	update_files = read_files(global_to_write)
 	scripts = read_scripts()
-	if "install" not in scripts:
-		install_script = generate_script(to_remove, to_write)
-		scripts["install"] = install_script
-	update_package = create_update_package(scripts, update_files)
+	update_package = create_update_package(scripts, update_files, to_remove, to_write)
 	with open("update.pickle", "wb") as f:
 		f.write(update_package)
 main("./old_release/", "./new_release/")
