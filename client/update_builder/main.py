@@ -4,6 +4,7 @@
 import pickle
 import hashlib
 import os
+import platform
 
 def hash_path(path, local_path = None):
 	if not local_path:
@@ -84,6 +85,13 @@ def read_scripts():
 			scripts[script_name] = f.read()
 	return scripts
 
+def GetFilename(program_version):
+        bits = platform.architecture()[0]
+        os = platform.system()
+        if os == "Windows":
+                os += platform.release()
+        return f"EchoUpdate{os}{bits}-{program_version}.update"
+
 def main(old_build_path, new_build_path):
 	old_build_path = old_build_path + ("/" if not old_build_path.endswith("/") else "")
 	new_build_path = new_build_path + ("/" if not new_build_path.endswith("/") else "")
@@ -98,6 +106,6 @@ def main(old_build_path, new_build_path):
 	update_files = read_files(global_to_write)
 	scripts = read_scripts()
 	update_package = create_update_package(scripts, update_files, to_remove, to_write)
-	with open("update.pickle", "wb") as f:
+	with open(f"{GetFilename(input('version: '))}", "wb") as f:
 		f.write(update_package)
 main("./old_release/", "./new_release/")
