@@ -9,6 +9,8 @@ from components.windows import banner_window
 from components.windows import login_window
 from components.windows import main_window
 
+from components.update_backend import update
+
 import PySimpleGUI as sg
 import pickle
 import os
@@ -18,9 +20,11 @@ import aiohttp
 import time
 import json
 
-program_version = "0.0.2"
+program_version = "0.0.2-test"
 program_flavour = "vanilla"
 settings = common.read_settings()
+
+print(f"Echo {program_version} ({program_flavour})")
 
 async def main():
 	inbox_value = ["-"*15+"\n"]
@@ -36,7 +40,7 @@ async def main():
 
 	@client.event.on_ready()
 	async def on_ready():
-		await main_window.loop(client, inbox_value)
+		await asyncio.gather(main_window.loop(client, inbox_value), update.loop("foxomet.ru", program_version))
 
 	await client.async_start()
 

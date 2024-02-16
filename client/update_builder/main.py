@@ -103,9 +103,13 @@ def main(old_build_path, new_build_path):
 	to_write = find_changed_files(old_file_hashes, new_file_hashes) + find_new_files(old_file_hashes, new_file_hashes)
 	global_to_write = [file_path.replace("./", "./new_release/") for file_path in to_write]
 
+	[print(f"removed {file}") for file in to_remove]
+	[print(f"written {file}") for file in to_write]
+
 	update_files = read_files(global_to_write)
 	scripts = read_scripts()
 	update_package = create_update_package(scripts, update_files, to_remove, to_write)
+	print(f"update size: {len(update_package)/1000} kilobytes")
 	with open(f"{GetFilename(input('version: '))}", "wb") as f:
 		f.write(update_package)
 main("./old_release/", "./new_release/")
