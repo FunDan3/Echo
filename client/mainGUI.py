@@ -20,6 +20,7 @@ import hashlib
 import aiohttp
 import time
 import json
+import subprocess
 
 async def main():
 	print(f"Echo {program_version} ({program_flavour})")
@@ -48,4 +49,7 @@ if __name__ == "__main__":
 	try:
 		asyncio.run(main())
 	except KeyboardInterrupt:
-		pass
+		if os.name == "posix":
+			subprocess.Popen(["./update"])
+		else:
+			subprocess.Popen(["./update.exe"])
