@@ -39,7 +39,7 @@ def write(path, data):
 	else:
 		with open(path, "wb") as f:
 			f.write(data)
-
+		print(f"written {path}")
 
 for path in to_remove:
 	remove(path)

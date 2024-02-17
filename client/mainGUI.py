@@ -1,6 +1,9 @@
 #! /usr/bin/python3
 # To install pysimplegui for windows use pip3 install "pysimplegui<5.0.0" due to some licensing.
-import EchoAPI
+program_version = "0.0.2"
+program_flavour = "vanilla"
+update_server = "foxomet.ru"
+
 import components.cryptography.SymetricEncryptionLayer as SEL
 from components import common
 
@@ -8,8 +11,6 @@ from components.windows import connect_window
 from components.windows import banner_window
 from components.windows import login_window
 from components.windows import main_window
-
-from components.update_backend import update
 
 import PySimpleGUI as sg
 import pickle
@@ -20,13 +21,10 @@ import aiohttp
 import time
 import json
 
-program_version = "0.0.2-test"
-program_flavour = "vanilla"
-settings = common.read_settings()
-
-print(f"Echo {program_version} ({program_flavour})")
-
 async def main():
+	print(f"Echo {program_version} ({program_flavour})")
+	settings = common.read_settings()
+
 	inbox_value = ["-"*15+"\n"]
 	ip = await connect_window.loop(settings, program_version, program_flavour)
 	client = EchoAPI.client(ip)
@@ -46,6 +44,7 @@ async def main():
 
 
 if __name__ == "__main__":
+	import EchoAPI
 	try:
 		asyncio.run(main())
 	except KeyboardInterrupt:
