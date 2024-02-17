@@ -39,7 +39,7 @@ async def main():
 
 	@client.event.on_ready()
 	async def on_ready():
-		await asyncio.gather(main_window.loop(client, inbox_value), update.loop("foxomet.ru", program_version))
+		await asyncio.gather(main_window.loop(client, inbox_value))
 
 	await client.async_start()
 
