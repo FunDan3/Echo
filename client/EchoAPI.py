@@ -248,8 +248,13 @@ class client:
 		server_response = await self.auth_request_post("fetch_message")
 		if not server_response:
 			return None
-		message = Message(server_response)
-		await message.load()
+		try:
+			message = Message(server_response)
+			await message.load()
+		except Exception as e:
+			print("Bad message!")
+			print(e)
+			return None
 		return message
 
 	async def fetch_messages(self):
