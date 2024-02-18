@@ -26,7 +26,6 @@ async def main():
 	print(f"Echo {program_version} ({program_flavour})")
 	settings = common.read_settings()
 
-	inbox_value = ["-"*15+"\n"]
 	ip = await connect_window.loop(settings, program_version, program_flavour)
 	client = EchoAPI.client(ip)
 	await banner_window.loop(client, settings)
@@ -35,7 +34,7 @@ async def main():
 	@client.event.on_message()
 	async def on_message(message):
 		global inbox_value
-		inbox_value[0] = "-"*15+"\n"+f"from {message.author.username}:{message.author.public_hash}"+"\n"+message.content.replace("-"*15, "")+"\n"+inbox_value
+		inbox_value[0] = "-"*15+"\n"+f"from {message.author.username}:{message.author.public_hash}"+"\n"+message.content.replace("-"*15, "")+"\n"+inbox_value[0]
 
 	@client.event.on_ready()
 	async def on_ready():
@@ -46,6 +45,7 @@ async def main():
 
 if __name__ == "__main__":
 	import EchoAPI
+	inbox_value = ["-"*15+"\n"]
 	try:
 		asyncio.run(main())
 	except KeyboardInterrupt:
