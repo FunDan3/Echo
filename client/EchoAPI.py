@@ -84,6 +84,7 @@ class User:
 	public_hash = None
 	kem_algorithm = None
 	sig_algorithm = None
+	description = None
 	def __init__(self, username):
 		self.username = username
 
@@ -91,6 +92,8 @@ class User:
 		self.public_key, self.public_sign, algorithms = await asyncio.gather(self.parent.basic_request_get("public_key", json_data = {"username": self.username}),
 			self.parent.basic_request_get("public_sign", json_data = {"username": self.username}),
 			self.parent.basic_request_get("algorithms", json_data = {"username": self.username}))
+		self.description = await self.parent.basic_request_get("read_description", json_data = {"username": self.username})
+		self.description = self.description.decode("utf-8")
 		algorithms = json.loads(algorithms)
 		self.kem_algorithm = algorithms["kem_algorithm"]
 		self.sig_algorithm = algorithms["sig_algorithm"]

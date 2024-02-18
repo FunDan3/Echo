@@ -82,6 +82,38 @@ else:
 
 api = WebServer(config["Host"], config["Port"])
 
+@api.post("/set_description")
+def set_user_description(interface):
+	interface.jsonize()
+	if not interface.verify(["login", "token", "description"]):
+		interface.write("Invalid request. Expected fields: 'login', 'token', 'description'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	if not verify_login(interface):
+		return
+	if len(interface.json["description"])>256:
+		interface.write("Description can be at max 256 characters")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(401)
+		return
+	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json", autowrite = False)
+	user_config["description"] = interface.json["description"]
+	user_config.save()
+	interface.finish(200)
+
+@api.get("/read_description")
+def read_user_description(interface):
+	if not interface.verify(["username"]):
+		interface.write("Invalid request. Expected fields: 'username'")
+		interface.header("Content-Type", "text/plain")
+		interface.finish(400)
+		return
+	user_config = DictLayer(f"./storage/users/{interface.json['username']}/data.json", autowrite = False)
+	interface.write(user_config["Description"])
+	interface.header("Content-Type", "text/plain")
+	interface.finish(200)
+
 @api.get("/echo-messager-server-info")
 def send_server_info(interface):
 	return_data = {"version": "0.0.2",
@@ -308,7 +340,8 @@ def register(interface):
 					"IpList": [interface.client_address.ip],
 					"kem_algorithm": interface.json["kem_algorithm"],
 					"sig_algorithm": interface.json["sig_algorithm"],
-					"DataSent": 0})
+					"DataSent": 0,
+					"Description": ""})
 	user_config.save()
 	message_config = DictLayer(f"./storage/users/{interface.json['login']}/inbox/messages.json", template = {"LastMID": 0, "MessagesMetadata": {}})
 	message_config.save()

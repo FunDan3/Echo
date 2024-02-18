@@ -27,9 +27,23 @@ async def password_change(client):
 		await asyncio.sleep(1/30)
 	window.close()
 
+async def set_description(client):
+	layout = [[sg.Input(key = "-DESCRIPTION-")],
+		  [sg.Button("Ok", key = "-SET-")]]
+	window = sg.Window("Change description", layout)
+	while True:
+		event, values = window.read(timeout = 0)
+		if event == "-SET-":
+			client.set_description(values["-DESCRIPTION-"])
+			break
+		await asyncio.sleep(1/30)
+	window.close()
+
+
 async def loop(client, inbox_value):
 	previous_user_name = " "
 	message_tab = [[sg.Text("User:", size = (10, 1)), sg.Input(key = "-USER-")],
+		       [sg.Text("", key = "-DESCRIPTION-")],
 		       [sg.Text("", key = "-PUBLIC_HASH-")],
 		       [sg.Text("", key = "-KEM_ALGO-")],
 		       [sg.Text("", key = "-SIG_ALGO-")],
@@ -50,11 +64,13 @@ async def loop(client, inbox_value):
 			previous_user_name = values["-USER-"]
 			try:
 				user, _ = await asyncio.gather(client.fetch_user(values["-USER-"]), asyncio.sleep(1/30))
+				window["-DESCRIPTION-"].update(user.description, visible = True)
 				window["-PUBLIC_HASH-"].update(user.public_hash)
 				window["-KEM_ALGO-"].update(user.kem_algorithm, visible = True)
 				window["-SIG_ALGO-"].update(user.sig_algorithm, visible = True)
 				window["-SEND-"].update(visible = True)
 			except Exception as e:
+				window["-DESCRIPTION-"].update(visible = False)
 				window["-SEND-"].update(visible = False)
 				window["-KEM_ALGO-"].update(visible = False)
 				window["-SIG_ALGO-"].update(visible = False)
