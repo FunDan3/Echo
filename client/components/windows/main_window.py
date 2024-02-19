@@ -29,13 +29,17 @@ async def password_change(client):
 
 async def set_description(client):
 	layout = [[sg.Input(key = "-DESCRIPTION-")],
+		  [sg.Text("", key = "-OUTPUT-")],
 		  [sg.Button("Ok", key = "-SET-")]]
 	window = sg.Window("Change description", layout)
 	while True:
 		event, values = window.read(timeout = 0)
 		if event == "-SET-":
-			client.set_description(values["-DESCRIPTION-"])
-			break
+			try:
+				await client.set_description(values["-DESCRIPTION-"])
+				break
+			except Exception as e:
+				window["-OUTPUT-"].update(str(e))
 		await asyncio.sleep(1/30)
 	window.close()
 
@@ -51,7 +55,8 @@ async def loop(client, inbox_value):
 		       [sg.Button("Send", key = "-SEND-", visible = False)]]
 	inbox_tab = [[sg.Text("", size = (70, 20), key = "-INBOX-")]]
 	account_tab = [[sg.Button("Delete my account", key = "-DELETE-")],
-		       [sg.Button("Change container password", key = "-CHANGE_PASSWORD-")]]
+		       [sg.Button("Change container password", key = "-CHANGE_PASSWORD-")],
+		       [sg.Button("Change account description", key = "-CHANGE_DESCRIPTION-")]]
 	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab), sg.Tab("Inbox", inbox_tab), sg.Tab("Account", account_tab)]])]]
 	window = sg.Window("Echo messager", layout)
 	FirstAccountDeletePush = True
@@ -77,6 +82,8 @@ async def loop(client, inbox_value):
 				window["-PUBLIC_HASH-"].update(str(e))
 		else:
 			await asyncio.sleep(1/30)
+		if event == "-CHANGE_DESCRIPTION-":
+			await set_description(client)
 		if event == "-CHANGE_PASSWORD-":
 			await password_change(client)
 		if event == "-DELETE-":

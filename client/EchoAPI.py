@@ -217,6 +217,9 @@ class client:
 					await self.verify_response(response)
 					return await response.read()
 
+	async def set_description(self, description):
+		await self.auth_request_post("set_description", json_data = {"description": description})
+
 	async def delete(self):
 		await self.auth_request_post("delete")
 		del self
