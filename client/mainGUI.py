@@ -28,7 +28,7 @@ async def main():
 
 	ip = await connect_window.loop(settings, program_version, program_flavour)
 	client = EchoAPI.client(ip)
-	await banner_window.loop(client, settings)
+	common.async_in_background(banner_window.loop(client, settings))
 	await login_window.loop(client, settings)
 
 	@client.event.on_message()

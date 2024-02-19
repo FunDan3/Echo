@@ -87,9 +87,9 @@ async def loop(client, inbox_value):
 		else:
 			await asyncio.sleep(1/30)
 		if event == "-CHANGE_DESCRIPTION-":
-			await set_description(client)
+			common.async_in_background(set_description(client))
 		if event == "-CHANGE_PASSWORD-":
-			await password_change(client)
+			common.async_in_background(password_change(client))
 		if event == "-DELETE-":
 			if FirstAccountDeletePush:
 				window["-DELETE-"].update("REALLY delete my account")
