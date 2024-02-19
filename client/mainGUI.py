@@ -1,6 +1,6 @@
 #! /usr/bin/python3
 # To install pysimplegui for windows use pip3 install "pysimplegui<5.0.0" due to some licensing.
-program_version = "0.0.2"
+program_version = "0.0.3"
 program_flavour = "vanilla"
 update_server = "foxomet.ru"
 

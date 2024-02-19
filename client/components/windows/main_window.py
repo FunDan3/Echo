@@ -58,9 +58,10 @@ async def loop(client, inbox_value):
 		       [sg.Multiline(key = "-MESSAGE-", size = (70, 10))],
 		       [sg.Button("Send", key = "-SEND-", visible = False)]]
 	inbox_tab = [[sg.Text("", size = (70, 20), key = "-INBOX-")]]
-	account_tab = [[sg.Button("Delete my account", key = "-DELETE-")],
+	account_tab = [[sg.Button("Change account description", key = "-CHANGE_DESCRIPTION-")],
 		       [sg.Button("Change container password", key = "-CHANGE_PASSWORD-")],
-		       [sg.Button("Change account description", key = "-CHANGE_DESCRIPTION-")]]
+		       [sg.Button("Delete my account", key = "-DELETE-", button_color = ("#222222", "#FF0000"))]]
+
 	layout = [[sg.TabGroup([[sg.Tab("Send message", message_tab), sg.Tab("Inbox", inbox_tab), sg.Tab("Account", account_tab)]])]]
 	window = sg.Window("Echo messager", layout)
 	FirstAccountDeletePush = True
@@ -73,17 +74,17 @@ async def loop(client, inbox_value):
 			previous_user_name = values["-USER-"]
 			try:
 				user, _ = await asyncio.gather(client.fetch_user(values["-USER-"]), asyncio.sleep(1/30))
-				window["-DESCRIPTION-"].update(user.description, visible = True)
-				window["-PUBLIC_HASH-"].update(user.public_hash)
+				window["-DESCRIPTION-"].update(user.description)
+				window["-PUBLIC_HASH-"].update(user.public_hash, visible = True)
 				window["-KEM_ALGO-"].update(user.kem_algorithm, visible = True)
 				window["-SIG_ALGO-"].update(user.sig_algorithm, visible = True)
 				window["-SEND-"].update(visible = True)
 			except Exception as e:
-				window["-DESCRIPTION-"].update(visible = False)
+				window["-DESCRIPTION-"].update(str(e))
 				window["-SEND-"].update(visible = False)
 				window["-KEM_ALGO-"].update(visible = False)
 				window["-SIG_ALGO-"].update(visible = False)
-				window["-PUBLIC_HASH-"].update(str(e))
+				window["-PUBLIC_HASH-"].update(visible = False)
 		else:
 			await asyncio.sleep(1/30)
 		if event == "-CHANGE_DESCRIPTION-":

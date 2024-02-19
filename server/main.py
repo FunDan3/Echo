@@ -116,7 +116,7 @@ def read_user_description(interface):
 
 @api.get("/echo-messager-server-info")
 def send_server_info(interface):
-	return_data = {"version": "0.0.2",
+	return_data = {"version": "0.0.3",
 	"flavour": "vanilla"}
 	interface.write(json.dumps(return_data))
 	interface.header("Content-Type", "text/json")
