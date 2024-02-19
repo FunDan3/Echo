@@ -19,6 +19,8 @@ async def password_change(client):
 	window = sg.Window("Change password", layout)
 	while True:
 		event, values = window.read(timeout = 0)
+		if event == sg.WINDOW_CLOSED:
+			break
 		if event == "-CHANGE-":
 			client.password = values["-PASSWORD-"]
 			with open("container.epickle", "wb") as f:
@@ -34,6 +36,8 @@ async def set_description(client):
 	window = sg.Window("Change description", layout)
 	while True:
 		event, values = window.read(timeout = 0)
+		if event == sg.WINDOW_CLOSED:
+			break
 		if event == "-SET-":
 			try:
 				await client.set_description(values["-DESCRIPTION-"])
