@@ -98,7 +98,7 @@ def set_user_description(interface):
 		interface.finish(401)
 		return
 	user_config = DictLayer(f"./storage/users/{interface.json['login']}/data.json", autowrite = False)
-	user_config["description"] = interface.json["description"]
+	user_config["Description"] = interface.json["description"]
 	user_config.save()
 	interface.finish(200)
 
