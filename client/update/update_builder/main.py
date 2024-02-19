@@ -18,7 +18,7 @@ def hash_path(path, local_path = None):
 		path = path + ("/" if not path.endswith("/") else "")
 		local_path = local_path + ("/" if not local_path.endswith("/") else "")
 		for file in os.listdir(path):
-			if file == "update":
+			if file == ("update" if os.name == "posix" else "update.exe"):
 				continue
 			file_local_path = local_path+file
 			file_path = path+file
